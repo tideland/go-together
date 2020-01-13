@@ -19,7 +19,6 @@ import (
 
 	"tideland.dev/go/audit/asserts"
 	"tideland.dev/go/together/actor"
-	"tideland.dev/go/together/notifier"
 )
 
 //--------------------
@@ -37,29 +36,30 @@ const (
 // TestPureOK is simply starting and stopping an Actor.
 func TestPureGoOK(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	signalbox := notifier.NewSignalbox()
-	act, err := actor.Go(actor.WithSignalbox(signalbox))
+	done := false
+	act, err := actor.Go(actor.WithFinalizer(func(err error) error {
+		done = true
+		return err
+	}))
 	assert.NoError(err)
 	assert.NotNil(act)
 
-	err = signalbox.Wait(notifier.Working, timeout)
-	assert.NoError(err)
-	assert.NoError(act.Stop(nil))
-	assert.NoError(act.Err())
+	assert.NoError(act.Stop())
+	assert.ErrorMatch(act.Err(), context.Canceled.Error())
+	assert.True(done)
 }
 
 // TestPureError is simply starting and stopping an Actor.
 // Returning the stop error.
-func TestPureGo(t *testing.T) {
+func TestPureError(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	signalbox := notifier.NewSignalbox()
-	act, err := actor.Go(actor.WithSignalbox(signalbox))
+	act, err := actor.Go(actor.WithFinalizer(func(err error) error {
+		return errors.New("damm")
+	}))
 	assert.NoError(err)
 	assert.NotNil(act)
 
-	err = signalbox.Wait(notifier.Working, timeout)
-	assert.NoError(err)
-	assert.ErrorMatch(act.Stop(errors.New("damn")), "damn")
+	assert.ErrorMatch(act.Stop(), "damn")
 	assert.ErrorMatch(act.Err(), "damn")
 }
 
@@ -73,7 +73,7 @@ func TestWithContext(t *testing.T) {
 	assert.NotNil(act)
 
 	cancel()
-	assert.NoError(act.Err())
+	assert.ErrorMatch(act.Err(), context.Canceled.Error())
 }
 
 // TestSync tests synchronous calls.
@@ -81,14 +81,13 @@ func TestSync(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	act, err := actor.Go()
 	assert.NoError(err)
-	defer act.Stop(nil)
+	defer act.Stop()
 
 	counter := 0
 
 	for i := 0; i < 5; i++ {
-		err := act.DoSync(func() error {
+		err := act.DoSync(func() {
 			counter++
-			return nil
 		})
 		assert.Nil(err)
 	}
@@ -101,13 +100,12 @@ func TestTimeout(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	act, err := actor.Go()
 	assert.NoError(err)
-	defer act.Stop(nil)
+	defer act.Stop()
 
 	// Scenario: Timeout is shorter than needed time, so error
 	// is returned.
-	err = act.DoSyncTimeout(func() error {
+	err = act.DoSyncTimeout(func() {
 		time.Sleep(time.Second)
-		return nil
 	}, 500*time.Millisecond)
 
 	assert.ErrorMatch(err, ".*timed out.*")
@@ -116,76 +114,100 @@ func TestTimeout(t *testing.T) {
 // TestAsyncWithQueueCap tests running multiple calls asynchronously.
 func TestAsyncWithQueueCap(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	act, err := actor.Go(actor.WithQueueCap(100))
+	act, err := actor.Go(actor.WithQueueCap(128))
 	assert.NoError(err)
-	defer act.Stop(nil)
+	defer act.Stop()
 
-	assert.Equal(act.QueueCap(), 100)
-
-	sigC := make(chan bool, 1)
-	doneC := make(chan bool, 1)
+	sigs := make(chan struct{}, 1)
+	done := make(chan struct{}, 1)
 
 	// Start background func waiting for the signals of
 	// the asynchrounous calls.
 	go func() {
 		count := 0
-		for range sigC {
+		for range sigs {
 			count++
-			if count == 100 {
+			if count == 128 {
 				break
 			}
 		}
-		doneC <- true
+		close(done)
 	}()
 
 	// Now start asynchrounous calls.
 	start := time.Now()
-	for i := 0; i < 100; i++ {
-		act.DoAsync(func() error {
+	for i := 0; i < 128; i++ {
+		act.DoAsync(func() {
 			time.Sleep(5 * time.Millisecond)
-			sigC <- true
-			return nil
+			sigs <- struct{}{}
 		})
 	}
 	enqueued := time.Since(start)
 
 	// Expect signal done to be sent about one second later.
-	<-doneC
-	done := time.Since(start)
+	<-done
+	duration := time.Since(start)
 
-	assert.True((done - 500*time.Millisecond) > enqueued)
+	assert.True((duration - 640*time.Millisecond) > enqueued)
 }
 
-// TestRecovery tests handling panics.
-func TestRecovery(t *testing.T) {
+// TestRecoveryOK tests handling panics successfully.
+func TestRecoveryOK(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	counter := 0
 	recovered := false
-	doneC := make(chan struct{})
+	done := make(chan struct{})
 	recoverer := func(reason interface{}) error {
 		recovered = true
-		close(doneC)
+		close(done)
 		return nil
 	}
 	act, err := actor.Go(actor.WithRecoverer(recoverer))
 	assert.NoError(err)
-	defer act.Stop(nil)
+	defer act.Stop()
 
-	err = act.DoSyncTimeout(func() error {
+	err = act.DoSyncTimeout(func() {
 		counter++
 		// Will crash on first call.
 		print(counter / (counter - 1))
-		return nil
 	}, time.Second)
 	assert.ErrorMatch(err, ".*timed out.*")
-	<-doneC
+	<-done
 	assert.True(recovered)
-	err = act.DoSync(func() error {
+	err = act.DoSync(func() {
 		counter++
-		return nil
 	})
 	assert.NoError(err)
 	assert.Equal(counter, 2)
+}
+
+// TestRecoveryError tests handling panics with error.
+func TestRecoveryError(t *testing.T) {
+	assert := asserts.NewTesting(t, asserts.FailStop)
+	counter := 0
+	recovered := false
+	done := make(chan struct{})
+	recoverer := func(reason interface{}) error {
+		recovered = true
+		close(done)
+		return errors.New("ouch")
+	}
+	act, err := actor.Go(actor.WithRecoverer(recoverer))
+	assert.NoError(err)
+	defer act.Stop()
+
+	err = act.DoSyncTimeout(func() {
+		counter++
+		// Will crash on first call.
+		print(counter / (counter - 1))
+	}, time.Second)
+	assert.ErrorMatch(err, "ouch")
+	<-done
+	assert.True(recovered)
+	err = act.DoSync(func() {
+		counter++
+	})
+	assert.ErrorMatch(err, "ouch")
 }
 
 // EOF

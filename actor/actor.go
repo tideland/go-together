@@ -12,11 +12,11 @@ package actor // import "tideland.dev/go/together/actor"
 //--------------------
 
 import (
-	"sync"
+	"context"
+	"fmt"
+	"sync/atomic"
 	"time"
 
-	"tideland.dev/go/together/loop"
-	"tideland.dev/go/together/notifier"
 	"tideland.dev/go/trace/failure"
 )
 
@@ -30,54 +30,76 @@ const (
 )
 
 //--------------------
-// RECOVERER
+// FUNCTION TYPES
 //--------------------
 
-// Recoverer allows a goroutine to react on a panic during its
-// work. If it returns nil the goroutine shall continue
-// work. Otherwise it will return with an error the gouroutine
-// may use for its continued processing.
+// Action defines the signature of an actor action.
+type Action func()
+
+// Recoverer allows the actor to react on a panic during its
+// work. If it returns nil the backend shall continue
+// work. Otherwise the error is stored and the backend
+// terminated.
 type Recoverer func(reason interface{}) error
+
+// Finalizer is called with the actors internal status when
+// the backend loop terminates.
+type Finalizer func(err error) error
 
 //--------------------
 // ACTOR
 //--------------------
 
-// Action defines the signature of an actor action.
-type Action func() error
-
 // Actor allows to simply use and control a goroutine.
 type Actor struct {
-	mu      sync.RWMutex
-	actionC chan Action
-	options []loop.Option
-	loop    *loop.Loop
-	err     error
+	ctx          context.Context
+	cancel       func()
+	asyncActions chan Action
+	syncActions  chan Action
+	recoverer    Recoverer
+	finalizer    Finalizer
+	err          atomic.Value
 }
 
 // Go starts an Actor with the passed options.
 func Go(options ...Option) (*Actor, error) {
 	// Init with options.
-	act := &Actor{}
+	act := &Actor{
+		syncActions: make(chan Action, 1),
+	}
 	for _, option := range options {
 		if err := option(act); err != nil {
-			// One of the options made troubles.
-			act.err = failure.First(act.err, err)
-			return nil, act.err
+			act.err.Store(err)
+			return nil, err
 		}
 	}
 	// Ensure default settings.
-	if act.actionC == nil {
-		act.actionC = make(chan Action, 1)
+	if act.ctx == nil {
+		act.ctx, act.cancel = context.WithCancel(context.Background())
+	} else {
+		act.ctx, act.cancel = context.WithCancel(act.ctx)
+	}
+	if act.asyncActions == nil {
+		act.asyncActions = make(chan Action, 1)
+	}
+	if act.recoverer == nil {
+		act.recoverer = func(reason interface{}) error {
+			return fmt.Errorf("actor panic: %v", reason)
+		}
 	}
 	// Create loop with its options.
-	l, err := loop.Go(act.worker, act.options...)
-	if err != nil {
-		act.err = failure.First(act.err, err)
-		return nil, act.err
-	}
-	act.loop = l
+	go act.backend()
 	return act, nil
+}
+
+// DoAsync send the actor function to the backend and returns
+// when it's queued.
+func (act *Actor) DoAsync(action Action) error {
+	if act.err.Load() != nil {
+		return act.err.Load().(error)
+	}
+	act.asyncActions <- action
+	return nil
 }
 
 // DoSync executes the actor function and returns when it's done
@@ -89,76 +111,81 @@ func (act *Actor) DoSync(action Action) error {
 // DoSyncTimeout executes the action and returns when it's done
 // or it has a timeout.
 func (act *Actor) DoSyncTimeout(action Action, timeout time.Duration) error {
-	waitC := make(chan struct{})
-	if err := act.DoAsync(func() error {
-		err := action()
-		close(waitC)
-		return err
-	}); err != nil {
-		return err
+	if act.err.Load() != nil {
+		return act.err.Load().(error)
+	}
+	done := make(chan struct{})
+	act.syncActions <- func() {
+		action()
+		close(done)
 	}
 	select {
-	case <-waitC:
+	case <-done:
 	case <-time.After(timeout):
-		return failure.New("synchronous actor do: timed out")
+		if act.err.Load() != nil {
+			return act.err.Load().(error)
+		}
+		return failure.New("synchronous actor do timed out")
 	}
 	return nil
-}
-
-// DoAsync executes the actor function and returns immediately
-func (act *Actor) DoAsync(action Action) error {
-	act.mu.Lock()
-	defer act.mu.Unlock()
-	if act.err != nil {
-		return act.err
-	}
-	act.actionC <- action
-	return nil
-}
-
-// Stop terminates the Actor with the passed error. That or
-// a potential earlier error will be returned.
-func (act *Actor) Stop(err error) error {
-	if act.loop != nil {
-		return act.loop.Stop(err)
-	}
-	return act.err
-}
-
-// Signaler allows getting information about the status of the actor.
-func (act *Actor) Signaler() notifier.Signaler {
-	act.mu.RLock()
-	defer act.mu.RUnlock()
-	return act.loop.Signaler()
 }
 
 // Err returns information if the Actor has an error.
 func (act *Actor) Err() error {
-	act.mu.Lock()
-	defer act.mu.Unlock()
-	if act.err != nil {
-		return act.err
+	if act.err.Load() != nil {
+		return act.err.Load().(error)
 	}
-	return act.loop.Err()
+	return nil
 }
 
-// QueueCap returns the capacity of the action queue.
-func (act *Actor) QueueCap() int {
-	act.mu.Lock()
-	defer act.mu.Unlock()
-	return cap(act.actionC)
+// Stop terminates the actor backend.
+func (act *Actor) Stop() error {
+	if act.err.Load() != nil {
+		return act.err.Load().(error)
+	}
+	act.cancel()
+	return nil
 }
 
-// worker is the Loop worker of the Actor.
-func (act *Actor) worker(closer *notifier.Closer) error {
+// backend runs the goroutine of the Actor.
+func (act *Actor) backend() {
+	if act.finalizer != nil {
+		defer func() {
+			err := act.err.Load().(error)
+			err = act.finalizer(err)
+			act.err.Store(err)
+		}()
+	}
+	for act.selector() {
+	}
+}
+
+// selector runs the select in a loop, including
+// a possible recoverer.
+func (act *Actor) selector() (ok bool) {
+	defer func() {
+		if reason := recover(); reason != nil {
+			// Panic!
+			err := act.recoverer(reason)
+			if err != nil {
+				act.err.Store(err)
+				ok = false
+			}
+			ok = true
+		} else {
+			// Regular ending.
+			ok = false
+		}
+	}()
 	for {
 		select {
-		case <-closer.Done():
-			return nil
-		case action := <-act.actionC:
-			if err := action(); err != nil {
-				return err
-			}
+		case <-act.ctx.Done():
+			act.err.Store(act.ctx.Err())
+			return
+		case action := <-act.asyncActions:
+			action()
+		case action := <-act.syncActions:
+			action()
 		}
 	}
 }

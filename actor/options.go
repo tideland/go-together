@@ -13,9 +13,6 @@ package actor // import "tideland.dev/go/together/actor"
 
 import (
 	"context"
-
-	"tideland.dev/go/together/loop"
-	"tideland.dev/go/together/notifier"
 )
 
 //--------------------
@@ -28,7 +25,7 @@ type Option func(act *Actor) error
 // WithContext allows to pass a context for cancellation or timeout.
 func WithContext(ctx context.Context) Option {
 	return func(act *Actor) error {
-		act.options = append(act.options, loop.WithContext(ctx))
+		act.ctx = ctx
 		return nil
 	}
 }
@@ -39,33 +36,24 @@ func WithQueueCap(c int) Option {
 		if c < 1 {
 			c = 1
 		}
-		act.actionC = make(chan Action, c)
+		act.asyncActions = make(chan Action, c)
 		return nil
 	}
 }
 
 // WithRecoverer defines the panic handler of an actor.
-func WithRecoverer(rcvr Recoverer) Option {
+func WithRecoverer(recoverer Recoverer) Option {
 	return func(act *Actor) error {
-		act.options = append(act.options, loop.WithRecoverer(loop.Recoverer(rcvr)))
-		return nil
-	}
-}
-
-// WithSignalbox add a notifier to make external monitors aware of
-// the Actors internal status.
-func WithSignalbox(signalbox *notifier.Signalbox) Option {
-	return func(act *Actor) error {
-		act.options = append(act.options, loop.WithSignalbox(signalbox))
+		act.recoverer = recoverer
 		return nil
 	}
 }
 
 // WithFinalizer sets a function for finalizing the
 // work of a Loop.
-func WithFinalizer(finalizer loop.Finalizer) Option {
+func WithFinalizer(finalizer Finalizer) Option {
 	return func(act *Actor) error {
-		act.options = append(act.options, loop.WithFinalizer(finalizer))
+		act.finalizer = finalizer
 		return nil
 	}
 }

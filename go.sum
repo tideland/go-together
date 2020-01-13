@@ -9,6 +9,10 @@ golang.org/x/sys v0.0.0-20190415145633-3fd5a3612ccd/go.mod h1:h1NjWce9XRLGQEsW7w
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/tools v0.0.0-20190311212946-11955173bddd/go.mod h1:LCzVGOaR6xXOjkQ3onu1FJEFr0SW1gC7cKk1uF8kGRs=
 golang.org/x/tools v0.0.0-20190415205951-2e9de471ebd3/go.mod h1:LCzVGOaR6xXOjkQ3onu1FJEFr0SW1gC7cKk1uF8kGRs=
+tideland.dev/go v0.2.0 h1:JC/dwuqqn8NfU2jTNytDCjzbUTsWFGj1V2XfYJn0MKI=
+tideland.dev/go/audit v0.3.0 h1:zUEjdr279z7OE+iFsqz8xQm4KrLRxARmUSg5TzlO2RY=
 tideland.dev/go/audit v0.3.0/go.mod h1:iVQWp3A7czp2I4eH9nHERMMqljQRuwqTKuEzxoj9crI=
+tideland.dev/go/net v0.0.0-20200110220510-b39ee91274d4 h1:4J+30BZDElsHllPL9KGbN/jmCtjp88o/g2PMlfKqwSY=
+tideland.dev/go/net v0.0.0-20200110220510-b39ee91274d4/go.mod h1:J9tp7LlE/VUKNuyuJ3JmfuqrBn+MU0MNWk+wGQ4XK50=
 tideland.dev/go/trace v0.0.0-20200110203012-77bd5be58e01 h1:KKlJTuzV2lnWnnI2dY6loIO1iHxnL9+akHnXrTVY8wc=
 tideland.dev/go/trace v0.0.0-20200110203012-77bd5be58e01/go.mod h1:f6HlDKt+dTy8DOdvnKmjcqi9EinZ5IZW/zCpAoPUubs=
