@@ -21,6 +21,7 @@
 //             if err != nil {
 //                 return err
 //             }
+//             // Reset when terminating w/o error.
 //             c.counter = 0
 //             return nil
 //         })
@@ -31,14 +32,20 @@
 //         return c, nil
 //     }
 //
-//     func (c *Counter) Incr(i int) int {
-//         var counter int
-//         c.act.DoSync(func() error {
-//             c.counter += i
-//             counter = c.counter
-//             return nil
+//     func (c *Counter) Incr() error {
+//         return c.act.DoAsync(func() {
+//             c.counter++
 //         })
-//         return counter
+//     }
+//
+//     func (c* Counter) Get() (int, error) {
+//         var counter int
+//         if c.act.DoSync(func() {
+//             counter = c.counter
+//         }); err != nil {
+//             return 0, err
+//         }
+//         return counter, nil
 //     }
 //
 // Different options for the constructor allow to pass a context for stopping,

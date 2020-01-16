@@ -45,13 +45,13 @@ func TestRateWindowBehavior(t *testing.T) {
 		first, _ := accessor.PeekFirst()
 		last, _ := accessor.PeekLast()
 		difference := last.Timestamp().Sub(first.Timestamp())
-		sigc <- difference
 		return event.NewPayload("difference", difference), nil
 	}
 	oncer := func(emitter mesh.Emitter, evt *event.Event) error {
 		difference := evt.Payload().At("difference").AsDuration(0)
 		assert.True(difference < duration)
 		assert.Equal(evt.Topic(), behaviors.TopicRateWindow)
+		sigc <- difference
 		return nil
 	}
 
@@ -61,7 +61,7 @@ func TestRateWindowBehavior(t *testing.T) {
 	)
 	msh.Subscribe("windower", "oncer")
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 250; i++ {
 		topic := generator.OneStringOf(topics...)
 		msh.Emit("windower", event.New(topic))
 		time.Sleep(time.Millisecond)

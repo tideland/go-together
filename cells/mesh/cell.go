@@ -113,56 +113,53 @@ func (c *cell) SetQueueCap(qc int) {
 // subscribers returns the subscriber IDs of the cell.
 func (c *cell) subscribers() ([]string, error) {
 	var subscriberIDs []string
-	if aerr := c.act.DoSync(func() error {
+	if err := c.act.DoSync(func() {
 		subscriberIDs = c.Subscribers()
-		return nil
-	}); aerr != nil {
-		return nil, failure.Annotate(aerr, "subscribers of cell %q", c.behavior.ID())
+	}); err != nil {
+		return nil, failure.Annotate(err, "subscribers of cell %q", c.behavior.ID())
 	}
 	return subscriberIDs, nil
 }
 
 // subscribe adds cells to the subscribers of this cell.
 func (c *cell) subscribe(subscribers []*cell) error {
-	if aerr := c.act.DoAsync(func() error {
+	if err := c.act.DoSync(func() {
 		for _, subscriber := range subscribers {
 			c.subscribedCells[subscriber.behavior.ID()] = subscriber
 		}
-		return nil
-	}); aerr != nil {
-		return failure.Annotate(aerr, "subscribe cell %q", c.behavior.ID())
+	}); err != nil {
+		return failure.Annotate(err, "subscribe cell %q", c.behavior.ID())
 	}
 	return nil
 }
 
 // unsubscribe removes cells from the subscribers of this cell.
 func (c *cell) unsubscribe(subscribers []*cell) error {
-	if aerr := c.act.DoAsync(func() error {
+	if err := c.act.DoSync(func() {
 		for _, subscriber := range subscribers {
 			delete(c.subscribedCells, subscriber.behavior.ID())
 		}
-		return nil
-	}); aerr != nil {
-		return failure.Annotate(aerr, "unsubscribe cell %q", c.behavior.ID())
+	}); err != nil {
+		return failure.Annotate(err, "unsubscribe cell %q", c.behavior.ID())
 	}
 	return nil
 }
 
 // process lets the cell behavior process the event asynchronously.
 func (c *cell) process(evt *event.Event) error {
-	if aerr := c.act.DoAsync(func() error {
+	var perr error
+	if err := c.act.DoAsync(func() {
 		if evt.Done() {
-			return nil
+			return
 		}
-		perr := c.behavior.Process(evt)
+		perr = c.behavior.Process(evt)
 		if perr != nil {
-			return c.behavior.Recover(perr)
+			perr = c.behavior.Recover(perr)
 		}
-		return nil
-	}); aerr != nil {
-		return failure.Annotate(aerr, "processing cell %q", c.behavior.ID())
+	}); err != nil {
+		return failure.Annotate(err, "processing cell %q", c.behavior.ID())
 	}
-	return nil
+	return perr
 }
 
 // Finalize implements the loop.Finalizer to perform termination
@@ -177,7 +174,7 @@ func (c *cell) finalize(err error) error {
 // stop tells the actor to stop with finalizing for termination
 // of the behavior.
 func (c *cell) stop() error {
-	if err := c.act.Stop(nil); err != nil {
+	if err := c.act.Stop(); err != nil {
 		return failure.Annotate(err, "stopping cell %q", c.behavior.ID())
 	}
 	return nil

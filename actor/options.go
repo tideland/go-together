@@ -33,8 +33,8 @@ func WithContext(ctx context.Context) Option {
 // WithQueueCap defines the channel capacity for actions sent to an Actor.
 func WithQueueCap(c int) Option {
 	return func(act *Actor) error {
-		if c < 1 {
-			c = 1
+		if c < DefaultQueueCap {
+			c = DefaultQueueCap
 		}
 		act.asyncActions = make(chan Action, c)
 		return nil

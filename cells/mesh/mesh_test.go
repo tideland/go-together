@@ -51,8 +51,7 @@ func TestSpawnCells(t *testing.T) {
 	assert.Contains(ids, "bar")
 	assert.Contains(ids, "baz")
 
-	err = msh.Stop()
-	assert.NoError(err)
+	assert.NoError(msh.Stop())
 }
 
 // TestSpawnDoubleCells verifies starting the mesh, spawning double
@@ -75,8 +74,7 @@ func TestSpawnDoubleCells(t *testing.T) {
 	ids := msh.Cells()
 	assert.Length(ids, 1)
 
-	err = msh.Stop()
-	assert.NoError(err)
+	assert.NoError(msh.Stop())
 }
 
 // TestSpawnErrorCells verifies starting the mesh, spawning cell
@@ -101,69 +99,7 @@ func TestSpawnErrorCells(t *testing.T) {
 	ids := msh.Cells()
 	assert.Length(ids, 3)
 
-	err = msh.Stop()
-	assert.NoError(err)
-}
-
-// TestSpawnConfigureCells verifies starting the mesh, spawning a self
-// configurating cell, and stops the mesh.
-func TestSpawnConfigureCells(t *testing.T) {
-	assert := asserts.NewTesting(t, asserts.FailStop)
-	msh := mesh.New()
-
-	err := msh.SpawnCells(
-		NewTestBehavior("foo"),
-		&TestConfigureBehavior{NewTestBehavior("bar"), 16},
-		&TestConfigureBehavior{NewTestBehavior("baz"), 64},
-		&TestConfigureBehavior{NewTestBehavior("invalid"), -128},
-	)
-	assert.NoError(err)
-	assert.Equal(mesh.GetCellQueueCap(msh, "foo"), 1)
-	assert.Equal(mesh.GetCellQueueCap(msh, "bar"), 16)
-	assert.Equal(mesh.GetCellQueueCap(msh, "baz"), 64)
-	assert.Equal(mesh.GetCellQueueCap(msh, "invalid"), 1)
-
-	err = msh.Stop()
-	assert.NoError(err)
-}
-
-// TestConfigureMesh verifies starting a configured mesh, spawning cells,
-// and stops the mesh.
-func TestConfigureMesh(t *testing.T) {
-	assert := asserts.NewTesting(t, asserts.FailStop)
-	msh := mesh.New(mesh.QueueCap(8))
-
-	err := msh.SpawnCells(
-		NewTestBehavior("foo"),
-		&TestConfigureBehavior{NewTestBehavior("bar"), 2},
-		&TestConfigureBehavior{NewTestBehavior("baz"), 16},
-		&TestConfigureBehavior{NewTestBehavior("invalid"), -128},
-	)
-	assert.NoError(err)
-	assert.Equal(mesh.GetCellQueueCap(msh, "foo"), 8)
-	assert.Equal(mesh.GetCellQueueCap(msh, "bar"), 2)
-	assert.Equal(mesh.GetCellQueueCap(msh, "baz"), 16)
-	assert.Equal(mesh.GetCellQueueCap(msh, "invalid"), 8)
-
-	err = msh.Stop()
-	assert.NoError(err)
-
-	msh = mesh.New(mesh.QueueCap(-16))
-
-	err = msh.SpawnCells(
-		NewTestBehavior("foo"),
-		&TestConfigureBehavior{NewTestBehavior("bar"), 2},
-		&TestConfigureBehavior{NewTestBehavior("baz"), 16},
-		&TestConfigureBehavior{NewTestBehavior("invalid"), -128},
-	)
-	assert.NoError(err)
-	assert.Equal(mesh.GetCellQueueCap(msh, "foo"), 1)
-	assert.Equal(mesh.GetCellQueueCap(msh, "bar"), 2)
-	assert.Equal(mesh.GetCellQueueCap(msh, "baz"), 16)
-	assert.Equal(mesh.GetCellQueueCap(msh, "invalid"), 1)
-
-	err = msh.Stop()
-	assert.NoError(err)
+	assert.NoError(msh.Stop())
 }
 
 // TestStopCells verifies stopping some cells.
@@ -206,8 +142,7 @@ func TestStopCells(t *testing.T) {
 	assert.Length(fooS, 1)
 	assert.Contains(fooS, "bar")
 
-	err = msh.Stop()
-	assert.NoError(err)
+	assert.NoError(msh.Stop())
 }
 
 // TestTermination verifies calling the termination method.
@@ -221,8 +156,7 @@ func TestTermination(t *testing.T) {
 	)
 	assert.NoError(err)
 
-	err = msh.Stop()
-	assert.ErrorMatch(err, ".*breaking.*")
+	assert.ErrorMatch(msh.Stop(), ".*breaking.*")
 }
 
 // TestEmitEvents verifies emitting some events to a node.
@@ -250,8 +184,7 @@ func TestEmitEvents(t *testing.T) {
 	assert.Equal(plr.At("b").AsInt(0), 2)
 	assert.Equal(plr.At("c").AsInt(0), 3)
 
-	err = msh.Stop()
-	assert.NoError(err)
+	assert.NoError(msh.Stop())
 }
 
 // TestEmitContextEvents verifies emitting some events with a context
@@ -286,8 +219,7 @@ func TestEmitContextEvents(t *testing.T) {
 	assert.Equal(plr.At("a").AsInt(0), 5)
 	assert.Equal(plr.At("b").AsInt(0), 5)
 
-	err = msh.Stop()
-	assert.NoError(err)
+	assert.NoError(msh.Stop())
 }
 
 // TestBroadcastEvents verifies broadcasting some events to a node.
@@ -320,8 +252,7 @@ func TestBroadcastEvents(t *testing.T) {
 	assertData("bar")
 	assertData("baz")
 
-	err = msh.Stop()
-	assert.NoError(err)
+	assert.NoError(msh.Stop())
 }
 
 // TestBehaviorEmit verifies the emitting to individual subscribers.
@@ -352,6 +283,8 @@ func TestBehaviorEmit(t *testing.T) {
 	waitEvents(assert, msh, "foo")
 	assertSend("bar", 1234)
 	assertSend("baz", 4321)
+
+	assert.NoError(msh.Stop())
 }
 
 // TestSubscribe verifies the subscription of cells.
@@ -395,8 +328,7 @@ func TestSubscribe(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(plr.At("length").AsInt(0), 4)
 
-	err = msh.Stop()
-	assert.NoError(err)
+	assert.NoError(msh.Stop())
 }
 
 // TestUnsubscribe verifies the unsubscription of cells.
@@ -428,8 +360,7 @@ func TestUnsubscribe(t *testing.T) {
 	assert.Length(fooS, 1)
 	assert.Contains(fooS, "bar")
 
-	err = msh.Stop()
-	assert.NoError(err)
+	assert.NoError(msh.Stop())
 }
 
 // TestInvalidSubscriptions verifies the invalid (un)subscriptions of cells.
@@ -458,8 +389,7 @@ func TestInvalidSubscriptions(t *testing.T) {
 	err = msh.Unsubscribe("foo", "bar")
 	assert.NoError(err)
 
-	err = msh.Stop()
-	assert.NoError(err)
+	assert.NoError(msh.Stop())
 }
 
 // TestSubscriberIDs verifies the retrieval of subscriber IDs.
@@ -492,8 +422,7 @@ func TestSubscriberIDs(t *testing.T) {
 	assert.NoError(err)
 	assert.Length(subscriberIDs, 1)
 
-	err = msh.Stop()
-	assert.NoError(err)
+	assert.NoError(msh.Stop())
 }
 
 //--------------------

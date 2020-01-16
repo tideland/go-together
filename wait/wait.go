@@ -1,6 +1,6 @@
 // Tideland Go Together - Wait
 //
-// Copyright (C) 2019 Frank Mueller / Tideland / Oldenburg / Germany
+// Copyright (C) 2019-2020 Frank Mueller / Tideland / Oldenburg / Germany
 //
 // All rights reserved. Use of this source code is governed
 // by the new BSD license.
@@ -38,7 +38,7 @@ func Poll(ctx context.Context, ticker Ticker, condition Condition) error {
 	for {
 		select {
 		case <-ctx.Done():
-			// Context is cancelled.
+			// Context has been cancelled.
 			return failure.Annotate(ctx.Err(), "context has been cancelled")
 		case _, open := <-tickc:
 			// Ticker sent a signal to check for condition.
@@ -132,8 +132,8 @@ func WithJitter(
 // PRIVATE HELPER
 //--------------------
 
-// check runs the condition by catches panics and returns them
-// as failure.
+// check runs the condition catching potential panics and returns
+// them as failure.
 func check(condition Condition) (ok bool, err error) {
 	defer func() {
 		if r := recover(); r != nil {

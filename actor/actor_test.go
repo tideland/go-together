@@ -45,7 +45,7 @@ func TestPureGoOK(t *testing.T) {
 	assert.NotNil(act)
 
 	assert.NoError(act.Stop())
-	assert.ErrorMatch(act.Err(), context.Canceled.Error())
+	assert.NoError(act.Err())
 	assert.True(done)
 }
 
@@ -54,7 +54,7 @@ func TestPureGoOK(t *testing.T) {
 func TestPureError(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	act, err := actor.Go(actor.WithFinalizer(func(err error) error {
-		return errors.New("damm")
+		return errors.New("damn")
 	}))
 	assert.NoError(err)
 	assert.NotNil(act)
@@ -73,7 +73,7 @@ func TestWithContext(t *testing.T) {
 	assert.NotNil(act)
 
 	cancel()
-	assert.ErrorMatch(act.Err(), context.Canceled.Error())
+	assert.NoError(act.Err())
 }
 
 // TestSync tests synchronous calls.

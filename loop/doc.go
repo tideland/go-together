@@ -12,15 +12,21 @@
 // efforts. The loop package helps to control this kind of goroutines.
 //
 //     type Printer struct {
-//	       printC chan string
+//	       prints chan string
 //         loop   loop.Loop
 //     }
 //
-//     func NewPrinter() (*Printer, error) {
+//     func NewPrinter(ctx context.Context) (*Printer, error) {
 //         p := &Printer{
-//             printC: make(chan string),
+//             ctx:    ctx,
+//             prints: make(chan string),
 //         }
-//         l, err := loop.Go(p.worker)
+//         l, err := loop.Go(
+//             p.worker,
+//             loop.WithContext(ctx),
+//             loop.WithFinalizer(func(err error) error {
+//                 ...
+//             })
 //         if err != nil {
 //             return nil, err
 //         }
@@ -28,17 +34,17 @@
 //         return p, nil
 //     }
 //
-//     func (p *printer) worker(c *notifier.Closer) error {
+//     func (p *printer) worker(lt loop.Terminator) error {
 //         for {
 //             select {
-//             case <-c.Done():
+//             case <-lt.Done():
 //                 return nil
-//             case str := <-printC:
+//             case str := <-p.prints:
 //                 println(str)
 //         }
 //     }
 //
-// The worker here now can be stopped with p.loop.Stop(err) returning
+// The worker here now can be stopped with p.loop.Stop() returning
 // a possible internal error. Also recovering of internal errors or
 // panics by starting the loop with a recoverer function is possible.
 // See the code examples.

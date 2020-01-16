@@ -45,7 +45,7 @@ func TestTopicPayloadsBehavior(t *testing.T) {
 	cProcessor := func(accessor event.SinkAccessor) (*event.Payload, error) {
 		err := accessor.Do(func(index int, evt *event.Event) error {
 			total := evt.Payload().At("total").AsInt(0)
-			assert.Range(total, 5, 25)
+			assert.Range(total, 1, 25)
 			return nil
 		})
 		sigc <- true

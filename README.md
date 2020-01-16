@@ -25,6 +25,3 @@ I hope you like it. ;)
 
 - Frank Mueller (https://github.com/themue / https://github.com/tideland / https://tideland.dev)
 
-## License
-
-**Tideland Go Together** is distributed under the terms of the BSD 3-Clause license.

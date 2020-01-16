@@ -14,7 +14,7 @@ package actor // import "tideland.dev/go/together/actor"
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"tideland.dev/go/trace/failure"
@@ -27,6 +27,10 @@ import (
 const (
 	// DefaultTimeout is used in a DoSync() call.
 	DefaultTimeout = 5 * time.Second
+
+	// DefaultQueueCap is the minimum and default capacity
+	// of the async actions queue.
+	DefaultQueueCap = 64
 )
 
 //--------------------
@@ -54,11 +58,12 @@ type Finalizer func(err error) error
 type Actor struct {
 	ctx          context.Context
 	cancel       func()
+	done         sync.WaitGroup
 	asyncActions chan Action
 	syncActions  chan Action
 	recoverer    Recoverer
 	finalizer    Finalizer
-	err          atomic.Value
+	err          failure.Error
 }
 
 // Go starts an Actor with the passed options.
@@ -67,9 +72,10 @@ func Go(options ...Option) (*Actor, error) {
 	act := &Actor{
 		syncActions: make(chan Action, 1),
 	}
+	act.done.Add(1)
 	for _, option := range options {
 		if err := option(act); err != nil {
-			act.err.Store(err)
+			act.err.Set(err)
 			return nil, err
 		}
 	}
@@ -80,11 +86,16 @@ func Go(options ...Option) (*Actor, error) {
 		act.ctx, act.cancel = context.WithCancel(act.ctx)
 	}
 	if act.asyncActions == nil {
-		act.asyncActions = make(chan Action, 1)
+		act.asyncActions = make(chan Action, DefaultQueueCap)
 	}
 	if act.recoverer == nil {
 		act.recoverer = func(reason interface{}) error {
 			return fmt.Errorf("actor panic: %v", reason)
+		}
+	}
+	if act.finalizer == nil {
+		act.finalizer = func(err error) error {
+			return err
 		}
 	}
 	// Create loop with its options.
@@ -95,8 +106,8 @@ func Go(options ...Option) (*Actor, error) {
 // DoAsync send the actor function to the backend and returns
 // when it's queued.
 func (act *Actor) DoAsync(action Action) error {
-	if act.err.Load() != nil {
-		return act.err.Load().(error)
+	if !act.err.IsNil() {
+		return act.err.Get()
 	}
 	act.asyncActions <- action
 	return nil
@@ -111,8 +122,8 @@ func (act *Actor) DoSync(action Action) error {
 // DoSyncTimeout executes the action and returns when it's done
 // or it has a timeout.
 func (act *Actor) DoSyncTimeout(action Action, timeout time.Duration) error {
-	if act.err.Load() != nil {
-		return act.err.Load().(error)
+	if !act.err.IsNil() {
+		return act.err.Get()
 	}
 	done := make(chan struct{})
 	act.syncActions <- func() {
@@ -122,8 +133,8 @@ func (act *Actor) DoSyncTimeout(action Action, timeout time.Duration) error {
 	select {
 	case <-done:
 	case <-time.After(timeout):
-		if act.err.Load() != nil {
-			return act.err.Load().(error)
+		if !act.err.IsNil() {
+			return act.err.Get()
 		}
 		return failure.New("synchronous actor do timed out")
 	}
@@ -132,46 +143,42 @@ func (act *Actor) DoSyncTimeout(action Action, timeout time.Duration) error {
 
 // Err returns information if the Actor has an error.
 func (act *Actor) Err() error {
-	if act.err.Load() != nil {
-		return act.err.Load().(error)
-	}
-	return nil
+	return act.err.Get()
 }
 
-// Stop terminates the actor backend.
+// Stop terminates the Actor backend.
 func (act *Actor) Stop() error {
-	if act.err.Load() != nil {
-		return act.err.Load().(error)
+	if !act.err.IsNil() {
+		return act.err.Get()
 	}
 	act.cancel()
-	return nil
+	act.done.Wait()
+	return act.err.Get()
 }
 
 // backend runs the goroutine of the Actor.
 func (act *Actor) backend() {
-	if act.finalizer != nil {
-		defer func() {
-			err := act.err.Load().(error)
-			err = act.finalizer(err)
-			act.err.Store(err)
-		}()
-	}
-	for act.selector() {
+	defer func() {
+		act.err.Set(act.finalizer(act.err.Get()))
+		act.done.Done()
+	}()
+	for act.loop() {
 	}
 }
 
-// selector runs the select in a loop, including
+// loop runs the select in a loop, including
 // a possible recoverer.
-func (act *Actor) selector() (ok bool) {
+func (act *Actor) loop() (ok bool) {
 	defer func() {
 		if reason := recover(); reason != nil {
 			// Panic!
 			err := act.recoverer(reason)
 			if err != nil {
-				act.err.Store(err)
+				act.err.Set(err)
 				ok = false
+			} else {
+				ok = true
 			}
-			ok = true
 		} else {
 			// Regular ending.
 			ok = false
@@ -180,7 +187,6 @@ func (act *Actor) selector() (ok bool) {
 	for {
 		select {
 		case <-act.ctx.Done():
-			act.err.Store(act.ctx.Err())
 			return
 		case action := <-act.asyncActions:
 			action()

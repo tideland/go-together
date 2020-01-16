@@ -17,7 +17,6 @@ import (
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
 	"tideland.dev/go/together/loop"
-	"tideland.dev/go/together/notifier"
 	"tideland.dev/go/trace/failure"
 )
 
@@ -55,7 +54,7 @@ func (b *cronjobBehavior) ID() string {
 // Init the behavior.
 func (b *cronjobBehavior) Init(emitter mesh.Emitter) error {
 	b.emitter = emitter
-	l, err := loop.Go(b.backend)
+	l, err := loop.Go(b.worker)
 	if err != nil {
 		return failure.Annotate(err, "init cronjob behavior")
 	}
@@ -65,7 +64,7 @@ func (b *cronjobBehavior) Init(emitter mesh.Emitter) error {
 
 // Terminate the behavior.
 func (b *cronjobBehavior) Terminate() error {
-	return b.loop.Stop(nil)
+	return b.loop.Stop()
 }
 
 // Process emits a ticker event each time the defined duration elapsed.
@@ -81,14 +80,14 @@ func (b *cronjobBehavior) Recover(err interface{}) error {
 	return nil
 }
 
-// backend is the sending a tick event to itself. It acts there to
+// worker is the sending a tick event to itself. It acts there to
 // avoid races when subscribers are updated.
-func (b *cronjobBehavior) backend(c *notifier.Closer) error {
+func (b *cronjobBehavior) worker(lt loop.Terminator) error {
 	ticker := time.NewTicker(b.duration)
 	defer ticker.Stop()
 	for {
 		select {
-		case <-c.Done():
+		case <-lt.Done():
 			return nil
 		case <-ticker.C:
 			b.emitter.Self(event.New(TopicTick))
