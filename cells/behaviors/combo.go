@@ -61,34 +61,37 @@ func (b *comboBehavior) Init(emitter mesh.Emitter) error {
 
 // Terminate the behavior.
 func (b *comboBehavior) Terminate() error {
-	b.sink.Clear()
-	return nil
+	return b.sink.Clear()
 }
 
 // Process matches events for a combination of criteria.
 func (b *comboBehavior) Process(evt *event.Event) error {
 	switch evt.Topic() {
 	case event.TopicReset:
-		b.sink.Clear()
+		return b.sink.Clear()
 	default:
-		b.sink.Push(evt)
+		if _, err := b.sink.Push(evt); err != nil {
+			return err
+		}
 		matches, pl := b.matches(b.sink)
 		switch matches {
 		case event.CriterionDone:
 			// All done, emit and start over.
-			b.emitter.Broadcast(event.New(TopicComboComplete, pl))
+			if err := b.emitter.Broadcast(event.New(TopicComboComplete, pl)); err != nil {
+				return err
+			}
 			b.sink = event.NewSink(0)
 		case event.CriterionKeep:
 			// So far ok.
 		case event.CriterionDropFirst:
 			// First event doesn't match.
-			b.sink.PullFirst()
+			_, _ = b.sink.PullFirst()
 		case event.CriterionDropLast:
-			// First event doesn't match.
-			b.sink.PullLast()
+			// Last event doesn't match.
+			_, _ = b.sink.PullLast()
 		default:
 			// Have to start from beginning.
-			b.sink.Clear()
+			_ = b.sink.Clear()
 		}
 	}
 	return nil
@@ -96,8 +99,7 @@ func (b *comboBehavior) Process(evt *event.Event) error {
 
 // Recover from an error.
 func (b *comboBehavior) Recover(err interface{}) error {
-	b.sink.Clear()
-	return nil
+	return b.sink.Clear()
 }
 
 // EOF

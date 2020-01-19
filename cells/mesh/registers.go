@@ -44,7 +44,6 @@ func (sr subscribedRegistry) remove(id string) {
 
 // cellEntry containes cells and the IDs of the cells it subscribed to.
 type cellEntry struct {
-	id           string
 	cell         *cell
 	subscribedTo subscribedRegistry
 }

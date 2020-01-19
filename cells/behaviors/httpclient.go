@@ -106,7 +106,7 @@ func (b *httpClientBehavior) broadcastReply(topic, id, url string, resp *http.Re
 			plvs = append(plvs, "data", data)
 		}
 	}
-	b.emitter.Broadcast(event.New(topic, plvs...))
+	_ = b.emitter.Broadcast(event.New(topic, plvs...))
 }
 
 // EOF

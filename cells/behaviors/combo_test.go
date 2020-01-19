@@ -33,7 +33,7 @@ func TestComboBehavior(t *testing.T) {
 	generator := generators.New(generators.FixedRand())
 	sigc := asserts.MakeWaitChan()
 	msh := mesh.New()
-	defer msh.Stop()
+	defer assert.NoError(msh.Stop())
 
 	matcher := func(accessor event.SinkAccessor) (event.CriterionMatch, *event.Payload) {
 		analyzer := event.NewSinkAnalyzer(accessor)
@@ -90,18 +90,18 @@ func TestComboBehavior(t *testing.T) {
 
 	topics := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "now"}
 
-	msh.SpawnCells(
+	assert.NoError(msh.SpawnCells(
 		behaviors.NewComboBehavior("combiner", matcher),
 		behaviors.NewCollectorBehavior("collector", 100, processor),
-	)
-	msh.Subscribe("combiner", "collector")
+	))
+	assert.NoError(msh.Subscribe("combiner", "collector"))
 
 	for i := 0; i < 1000; i++ {
 		topic := generator.OneStringOf(topics...)
-		msh.Emit("combiner", event.New(topic))
+		assert.NoError(msh.Emit("combiner", event.New(topic)))
 	}
 
-	msh.Emit("collector", event.New(event.TopicProcess))
+	assert.NoError(msh.Emit("collector", event.New(event.TopicProcess)))
 	assert.Wait(sigc, true, time.Minute)
 }
 

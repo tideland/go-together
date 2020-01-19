@@ -66,7 +66,9 @@ func (b *roundRobinBehavior) Process(evt *event.Event) error {
 		b.current = 0
 	}
 	sort.Strings(subscribers)
-	b.emitter.Emit(subscribers[b.current], evt)
+	if err := b.emitter.Emit(subscribers[b.current], evt); err != nil {
+		return err
+	}
 	b.current++
 	return nil
 }

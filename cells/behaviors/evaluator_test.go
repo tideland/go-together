@@ -31,7 +31,7 @@ func TestEvaluatorBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	sigc := asserts.MakeWaitChan()
 	msh := mesh.New()
-	defer msh.Stop()
+	defer assert.NoError(msh.Stop())
 
 	evaluator := func(evt *event.Event) (float64, error) {
 		i, err := strconv.Atoi(evt.Topic())
@@ -44,21 +44,21 @@ func TestEvaluatorBehavior(t *testing.T) {
 		return nil, nil
 	}
 
-	msh.SpawnCells(
+	assert.NoError(msh.SpawnCells(
 		behaviors.NewEvaluatorBehavior("evaluator", evaluator),
 		behaviors.NewCollectorBehavior("collector", 1000, processor),
-	)
-	msh.Subscribe("evaluator", "collector")
+	))
+	assert.NoError(msh.Subscribe("evaluator", "collector"))
 
 	// Standard evaluating.
 	topics := []string{"2", "1", "1", "1", "3", "2", "3", "1", "3", "9"}
 	for _, topic := range topics {
-		msh.Emit("evaluator", event.New(topic))
+		assert.NoError(msh.Emit("evaluator", event.New(topic)))
 	}
 	time.Sleep(100 * time.Millisecond)
 
-	msh.Emit("collector", event.New(event.TopicProcess))
-	msh.Emit("collector", event.New(event.TopicReset))
+	assert.NoError(msh.Emit("collector", event.New(event.TopicProcess)))
+	assert.NoError(msh.Emit("collector", event.New(event.TopicReset)))
 
 	assert.WaitTested(sigc, func(value interface{}) error {
 		evt, ok := value.(*event.Event)
@@ -72,12 +72,12 @@ func TestEvaluatorBehavior(t *testing.T) {
 	}, time.Second)
 
 	// Reset and check with only one value.
-	msh.Emit("evaluator", event.New(event.TopicReset))
-	msh.Emit("evaluator", event.New("1234"))
+	assert.NoError(msh.Emit("evaluator", event.New(event.TopicReset)))
+	assert.NoError(msh.Emit("evaluator", event.New("1234")))
 	time.Sleep(100 * time.Millisecond)
 
-	msh.Emit("collector", event.New(event.TopicProcess))
-	msh.Emit("collector", event.New(event.TopicReset))
+	assert.NoError(msh.Emit("collector", event.New(event.TopicProcess)))
+	assert.NoError(msh.Emit("collector", event.New(event.TopicReset)))
 
 	assert.WaitTested(sigc, func(value interface{}) error {
 		evt, ok := value.(*event.Event)
@@ -93,12 +93,12 @@ func TestEvaluatorBehavior(t *testing.T) {
 	// Crash evaluating.
 	topics = []string{"2", "1", "3", "4", "crash", "1", "2", "1", "2", "1"}
 	for _, topic := range topics {
-		msh.Emit("evaluator", event.New(topic))
+		assert.NoError(msh.Emit("evaluator", event.New(topic)))
 	}
 	time.Sleep(100 * time.Millisecond)
 
-	msh.Emit("collector", event.New(event.TopicProcess))
-	msh.Emit("collector", event.New(event.TopicReset))
+	assert.NoError(msh.Emit("collector", event.New(event.TopicProcess)))
+	assert.NoError(msh.Emit("collector", event.New(event.TopicReset)))
 
 	assert.WaitTested(sigc, func(value interface{}) error {
 		evt, ok := value.(*event.Event)
@@ -117,7 +117,7 @@ func TestLimitedEvaluatorBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	sigc := asserts.MakeWaitChan()
 	msh := mesh.New()
-	defer msh.Stop()
+	defer assert.NoError(msh.Stop())
 
 	evaluator := func(evt *event.Event) (float64, error) {
 		i, err := strconv.Atoi(evt.Topic())
@@ -130,21 +130,21 @@ func TestLimitedEvaluatorBehavior(t *testing.T) {
 		return nil, nil
 	}
 
-	msh.SpawnCells(
+	assert.NoError(msh.SpawnCells(
 		behaviors.NewMovingEvaluatorBehavior("evaluator", evaluator, 5),
 		behaviors.NewCollectorBehavior("collector", 1000, processor),
-	)
-	msh.Subscribe("evaluator", "collector")
+	))
+	assert.NoError(msh.Subscribe("evaluator", "collector"))
 
 	// Standard evaluating.
 	topics := []string{"1", "2", "1", "1", "9", "2", "3", "1", "3", "2"}
 	for _, topic := range topics {
-		msh.Emit("evaluator", event.New(topic))
+		assert.NoError(msh.Emit("evaluator", event.New(topic)))
 	}
 	time.Sleep(100 * time.Millisecond)
 
-	msh.Emit("collector", event.New(event.TopicProcess))
-	msh.Emit("collector", event.New(event.TopicReset))
+	assert.NoError(msh.Emit("collector", event.New(event.TopicProcess)))
+	assert.NoError(msh.Emit("collector", event.New(event.TopicReset)))
 
 	assert.WaitTested(sigc, func(value interface{}) error {
 		evt, ok := value.(*event.Event)

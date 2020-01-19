@@ -32,26 +32,26 @@ func TestCollectorBehavior(t *testing.T) {
 	generator := generators.New(generators.FixedRand())
 	sigc := asserts.MakeWaitChan()
 	msh := mesh.New()
-	defer msh.Stop()
+	defer assert.NoError(msh.Stop())
 
 	processor := func(accessor event.SinkAccessor) (*event.Payload, error) {
 		sigc <- accessor.Len()
 		return nil, nil
 	}
 
-	msh.SpawnCells(behaviors.NewCollectorBehavior("collector", 10, processor))
+	assert.NoError(msh.SpawnCells(behaviors.NewCollectorBehavior("collector", 10, processor)))
 
 	// Don't care for words, we collect maximally 10 events.
 	for _, word := range generator.Words(25) {
-		msh.Emit("collector", event.New("collect", word))
+		assert.NoError(msh.Emit("collector", event.New("collect", word)))
 	}
 
-	msh.Emit("collector", event.New(event.TopicProcess))
+	assert.NoError(msh.Emit("collector", event.New(event.TopicProcess)))
 	assert.Wait(sigc, 10, time.Second)
 
-	msh.Emit("collector", event.New(event.TopicReset))
+	assert.NoError(msh.Emit("collector", event.New(event.TopicReset)))
 
-	msh.Emit("collector", event.New(event.TopicProcess))
+	assert.NoError(msh.Emit("collector", event.New(event.TopicProcess)))
 	assert.Wait(sigc, 0, time.Second)
 }
 

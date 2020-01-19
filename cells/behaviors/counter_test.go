@@ -30,7 +30,7 @@ func TestCounterBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	sigc := asserts.MakeWaitChan()
 	msh := mesh.New()
-	defer msh.Stop()
+	defer assert.NoError(msh.Stop())
 
 	counters := func(evt *event.Event) []string {
 		return evt.Payload().Keys()
@@ -47,15 +47,15 @@ func TestCounterBehavior(t *testing.T) {
 		return nil
 	}
 
-	msh.SpawnCells(
+	assert.NoError(msh.SpawnCells(
 		behaviors.NewCounterBehavior("counter", counters),
 		behaviors.NewConditionBehavior("conditioner", tester, processor),
-	)
-	msh.Subscribe("counter", "conditioner")
+	))
+	assert.NoError(msh.Subscribe("counter", "conditioner"))
 
-	msh.Emit("counter", event.New("count", "a", 1, "b", 1))
-	msh.Emit("counter", event.New("count", "a", 1, "c", 1, "d", 1))
-	msh.Emit("counter", event.New("count", "a", 1, "d", 1))
+	assert.NoError(msh.Emit("counter", event.New("count", "a", 1, "b", 1)))
+	assert.NoError(msh.Emit("counter", event.New("count", "a", 1, "c", 1, "d", 1)))
+	assert.NoError(msh.Emit("counter", event.New("count", "a", 1, "d", 1)))
 
 	assert.Wait(sigc, true, time.Second)
 }

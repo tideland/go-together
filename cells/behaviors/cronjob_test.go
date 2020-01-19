@@ -30,30 +30,29 @@ func TestCronjobBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	sigc := asserts.MakeWaitChan()
 	msh := mesh.New()
-	defer msh.Stop()
+	defer assert.NoError(msh.Stop())
 
 	cronjob := func(emitter mesh.Emitter) {
-		emitter.Broadcast(event.New("action"))
+		assert.NoError(emitter.Broadcast(event.New("action")))
 	}
 	processor := func(accessor event.SinkAccessor) (*event.Payload, error) {
 		sigc <- accessor.Len()
-		accessor.Do(func(index int, evt *event.Event) error {
+		assert.NoError(accessor.Do(func(index int, evt *event.Event) error {
 			assert.Equal(evt.Topic(), "action")
 			return nil
-		})
+		}))
 		return nil, nil
 	}
 
-	msh.SpawnCells(
+	assert.NoError(msh.SpawnCells(
 		behaviors.NewCronjobBehavior("cronjob", 50*time.Millisecond, cronjob),
 		behaviors.NewCollectorBehavior("collector", 10, processor),
-	)
-	err := msh.Subscribe("cronjob", "collector")
-	assert.NoError(err)
+	))
+	assert.NoError(msh.Subscribe("cronjob", "collector"))
 
 	time.Sleep(550 * time.Millisecond)
 
-	msh.Emit("collector", event.New(event.TopicProcess))
+	assert.NoError(msh.Emit("collector", event.New(event.TopicProcess)))
 	assert.Wait(sigc, 10, time.Minute)
 }
 

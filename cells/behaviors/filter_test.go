@@ -32,7 +32,7 @@ func TestFilterBehavior(t *testing.T) {
 	selects := 0
 	excludes := 0
 	msh := mesh.New()
-	defer msh.Stop()
+	defer assert.NoError(msh.Stop())
 
 	filter := func(evt *event.Event) (bool, error) {
 		payload := evt.Payload().At("test").AsString("")
@@ -51,31 +51,31 @@ func TestFilterBehavior(t *testing.T) {
 		return nil
 	}
 
-	msh.SpawnCells(
+	assert.NoError(msh.SpawnCells(
 		behaviors.NewSelectFilterBehavior("select", filter),
 		behaviors.NewConditionBehavior("selects", selectConditioner, processor),
 		behaviors.NewExcludeFilterBehavior("exclude", filter),
 		behaviors.NewConditionBehavior("excludes", excludesConditioner, processor),
-	)
-	msh.Subscribe("select", "selects")
-	msh.Subscribe("exclude", "excludes")
+	))
+	assert.NoError(msh.Subscribe("select", "selects"))
+	assert.NoError(msh.Subscribe("exclude", "excludes"))
 
-	msh.Emit("select", event.New("a", "test", "a"))
-	msh.Emit("select", event.New("a", "test", "b"))
-	msh.Emit("select", event.New("a", "test", "c"))
-	msh.Emit("select", event.New("a", "test", "d"))
-	msh.Emit("select", event.New("b", "test", "b"))
-	msh.Emit("select", event.New("b", "test", "a"))
-
+	data := [][2]string{
+		{"a", "a"},
+		{"a", "b"},
+		{"a", "c"},
+		{"a", "d"},
+		{"b", "b"},
+		{"b", "a"},
+	}
+	for _, d := range data {
+		assert.NoError(msh.Emit("select", event.New(d[0], "test", d[1])))
+	}
 	assert.Wait(sigc, true, time.Second)
 
-	msh.Emit("exclude", event.New("a", "test", "a"))
-	msh.Emit("exclude", event.New("a", "test", "b"))
-	msh.Emit("exclude", event.New("a", "test", "c"))
-	msh.Emit("exclude", event.New("a", "test", "d"))
-	msh.Emit("exclude", event.New("b", "test", "b"))
-	msh.Emit("exclude", event.New("b", "test", "a"))
-
+	for _, d := range data {
+		assert.NoError(msh.Emit("exclude", event.New(d[0], "test", d[1])))
+	}
 	assert.Wait(sigc, true, time.Second)
 }
 

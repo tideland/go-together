@@ -43,15 +43,15 @@ func TestSpawnCells(t *testing.T) {
 		NewTestBehavior("bar"),
 		NewTestBehavior("baz"),
 	)
-	assert.NoError(err)
+	assert.OK(err)
 
 	ids := msh.Cells()
 	assert.Length(ids, 3)
-	assert.Contains(ids, "foo")
-	assert.Contains(ids, "bar")
-	assert.Contains(ids, "baz")
+	assert.Contents("foo", ids)
+	assert.Contents("bar", ids)
+	assert.Contents("baz", ids)
 
-	assert.NoError(msh.Stop())
+	assert.OK(msh.Stop())
 }
 
 // TestSpawnDoubleCells verifies starting the mesh, spawning double
@@ -63,7 +63,7 @@ func TestSpawnDoubleCells(t *testing.T) {
 	err := msh.SpawnCells(
 		NewTestBehavior("foo"),
 	)
-	assert.NoError(err)
+	assert.OK(err)
 
 	err = msh.SpawnCells(
 		NewTestBehavior("foo"),
@@ -74,7 +74,7 @@ func TestSpawnDoubleCells(t *testing.T) {
 	ids := msh.Cells()
 	assert.Length(ids, 1)
 
-	assert.NoError(msh.Stop())
+	assert.OK(msh.Stop())
 }
 
 // TestSpawnErrorCells verifies starting the mesh, spawning cell
@@ -87,7 +87,7 @@ func TestSpawnErrorCells(t *testing.T) {
 		NewTestBehavior("foo"),
 		NewTestBehavior("bar"),
 	)
-	assert.NoError(err)
+	assert.OK(err)
 
 	err = msh.SpawnCells(
 		NewTestBehavior("crash"),
@@ -99,7 +99,7 @@ func TestSpawnErrorCells(t *testing.T) {
 	ids := msh.Cells()
 	assert.Length(ids, 3)
 
-	assert.NoError(msh.Stop())
+	assert.OK(msh.Stop())
 }
 
 // TestStopCells verifies stopping some cells.
@@ -113,36 +113,36 @@ func TestStopCells(t *testing.T) {
 		NewTestBehavior("bar"),
 		NewTestBehavior("baz"),
 	)
-	assert.NoError(err)
+	assert.OK(err)
 
 	ids := msh.Cells()
 	assert.Length(ids, 3)
-	assert.Contains(ids, "foo")
-	assert.Contains(ids, "bar")
-	assert.Contains(ids, "baz")
+	assert.Contents("foo", ids)
+	assert.Contents("bar", ids)
+	assert.Contents("baz", ids)
 
-	msh.Subscribe("foo", "bar", "baz")
+	assert.OK(msh.Subscribe("foo", "bar", "baz"))
 
 	fooS, err := msh.Subscribers("foo")
-	assert.NoError(err)
+	assert.OK(err)
 	assert.Length(fooS, 2)
-	assert.Contains(fooS, "bar")
-	assert.Contains(fooS, "baz")
+	assert.Contents("bar", fooS)
+	assert.Contents("baz", fooS)
 
 	// Stopping shall unsubscribe too.
-	err = msh.StopCells("baz")
+	assert.OK(msh.StopCells("baz"))
 
 	ids = msh.Cells()
 	assert.Length(ids, 2)
-	assert.Contains(ids, "foo")
-	assert.Contains(ids, "bar")
+	assert.Contents("foo", ids)
+	assert.Contents("bar", ids)
 
 	fooS, err = msh.Subscribers("foo")
-	assert.NoError(err)
+	assert.OK(err)
 	assert.Length(fooS, 1)
-	assert.Contains(fooS, "bar")
+	assert.Contents("bar", fooS)
 
-	assert.NoError(msh.Stop())
+	assert.OK(msh.Stop())
 }
 
 // TestTermination verifies calling the termination method.
@@ -154,7 +154,7 @@ func TestTermination(t *testing.T) {
 	err := msh.SpawnCells(
 		NewTestBehavior("bang"),
 	)
-	assert.NoError(err)
+	assert.OK(err)
 
 	assert.ErrorMatch(msh.Stop(), ".*breaking.*")
 }
@@ -167,24 +167,24 @@ func TestEmitEvents(t *testing.T) {
 	err := msh.SpawnCells(
 		NewTestBehavior("foo"),
 	)
-	assert.NoError(err)
+	assert.OK(err)
 
-	msh.Emit("foo", event.New("set", "a", 1))
-	msh.Emit("foo", event.New("set", "b", 2))
-	msh.Emit("foo", event.New("set", "c", 3))
+	assert.OK(msh.Emit("foo", event.New("set", "a", 1)))
+	assert.OK(msh.Emit("foo", event.New("set", "b", 2)))
+	assert.OK(msh.Emit("foo", event.New("set", "c", 3)))
 
 	pl, plc := event.NewReplyPayload()
 
-	msh.Emit("foo", event.New("send", pl))
+	assert.OK(msh.Emit("foo", event.New("send", pl)))
 
 	plr, err := plc.Wait(waitTimeout)
 
-	assert.NoError(err)
+	assert.OK(err)
 	assert.Equal(plr.At("a").AsInt(0), 1)
 	assert.Equal(plr.At("b").AsInt(0), 2)
 	assert.Equal(plr.At("c").AsInt(0), 3)
 
-	assert.NoError(msh.Stop())
+	assert.OK(msh.Stop())
 }
 
 // TestEmitContextEvents verifies emitting some events with a context
@@ -196,30 +196,30 @@ func TestEmitContextEvents(t *testing.T) {
 	err := msh.SpawnCells(
 		NewTestBehavior("foo"),
 	)
-	assert.NoError(err)
+	assert.OK(err)
 
 	ctxA := context.Background()
 	ctxB, cancel := context.WithTimeout(ctxA, 5*time.Millisecond)
 	defer cancel()
 
-	msh.Emit("foo", event.WithContext(ctxA, "set", "a", 5))
-	msh.Emit("foo", event.WithContext(ctxA, "set", "b", 5))
+	assert.OK(msh.Emit("foo", event.WithContext(ctxA, "set", "a", 5)))
+	assert.OK(msh.Emit("foo", event.WithContext(ctxA, "set", "b", 5)))
 
 	time.Sleep(20 * time.Millisecond)
 
-	msh.Emit("foo", event.WithContext(ctxB, "set", "b", 10))
+	assert.OK(msh.Emit("foo", event.WithContext(ctxB, "set", "b", 10)))
 
 	pl, plc := event.NewReplyPayload()
 
-	msh.Emit("foo", event.New("send", pl))
+	assert.OK(msh.Emit("foo", event.New("send", pl)))
 
 	plr, err := plc.Wait(waitTimeout)
 
-	assert.NoError(err)
+	assert.OK(err)
 	assert.Equal(plr.At("a").AsInt(0), 5)
 	assert.Equal(plr.At("b").AsInt(0), 5)
 
-	assert.NoError(msh.Stop())
+	assert.OK(msh.Stop())
 }
 
 // TestBroadcastEvents verifies broadcasting some events to a node.
@@ -233,7 +233,7 @@ func TestBroadcastEvents(t *testing.T) {
 
 		plr, err := plc.Wait(waitTimeout)
 
-		assert.NoError(err)
+		assert.OK(err)
 		assert.Equal(plr.At("a").AsInt(0), 1)
 		assert.Equal(plr.At("b").AsInt(0), 2)
 		assert.Equal(plr.At("c").AsInt(0), 3)
@@ -244,7 +244,7 @@ func TestBroadcastEvents(t *testing.T) {
 		NewTestBehavior("bar"),
 		NewTestBehavior("baz"),
 	)
-	assert.NoError(err)
+	assert.OK(err)
 
 	msh.Broadcast(event.New("set", "a", 1, "b", 2, "c", 3))
 
@@ -252,7 +252,7 @@ func TestBroadcastEvents(t *testing.T) {
 	assertData("bar")
 	assertData("baz")
 
-	assert.NoError(msh.Stop())
+	assert.OK(msh.Stop())
 }
 
 // TestBehaviorEmit verifies the emitting to individual subscribers.
@@ -265,7 +265,7 @@ func TestBehaviorEmit(t *testing.T) {
 		NewTestBehavior("bar"),
 		NewTestBehavior("baz"),
 	)
-	assert.NoError(err)
+	assert.OK(err)
 
 	msh.Subscribe("foo", "bar", "baz")
 
@@ -276,7 +276,7 @@ func TestBehaviorEmit(t *testing.T) {
 		pl, plc := event.NewReplyPayload()
 		msh.Emit(id, event.New("send", pl))
 		plr, err := plc.Wait(waitTimeout)
-		assert.NoError(err)
+		assert.OK(err)
 		assert.Equal(plr.At("value").AsInt(0), value)
 	}
 
@@ -284,7 +284,7 @@ func TestBehaviorEmit(t *testing.T) {
 	assertSend("bar", 1234)
 	assertSend("baz", 4321)
 
-	assert.NoError(msh.Stop())
+	assert.OK(msh.Stop())
 }
 
 // TestSubscribe verifies the subscription of cells.
@@ -297,23 +297,23 @@ func TestSubscribe(t *testing.T) {
 		NewTestBehavior("bar"),
 		NewTestBehavior("baz"),
 	)
-	assert.NoError(err)
+	assert.OK(err)
 
 	msh.Subscribe("foo", "bar", "baz")
 
 	// Directly ask mesh.
 	fooS, err := msh.Subscribers("foo")
-	assert.NoError(err)
+	assert.OK(err)
 	assert.Length(fooS, 2)
-	assert.Contains(fooS, "bar")
-	assert.Contains(fooS, "baz")
+	assert.Contents("bar", fooS)
+	assert.Contents("baz", fooS)
 
 	// Send event to store subscribers
 	msh.Emit("foo", event.New("subscribers"))
 	pl, plc := event.NewReplyPayload()
 	msh.Emit("foo", event.New("send", pl))
 	plr, err := plc.Wait(waitTimeout)
-	assert.NoError(err)
+	assert.OK(err)
 	assert.Equal(plr.At("bar").AsInt(0), 1)
 	assert.Equal(plr.At("baz").AsInt(0), 1)
 
@@ -325,10 +325,10 @@ func TestSubscribe(t *testing.T) {
 	// Ask bar for received length.
 	msh.Emit("bar", event.New("send", pl))
 	plr, err = plc.Wait(waitTimeout)
-	assert.NoError(err)
+	assert.OK(err)
 	assert.Equal(plr.At("length").AsInt(0), 4)
 
-	assert.NoError(msh.Stop())
+	assert.OK(msh.Stop())
 }
 
 // TestUnsubscribe verifies the unsubscription of cells.
@@ -341,26 +341,26 @@ func TestUnsubscribe(t *testing.T) {
 		NewTestBehavior("bar"),
 		NewTestBehavior("baz"),
 	)
-	assert.NoError(err)
+	assert.OK(err)
 
 	// Subscribe bar and baz, test both.
 	msh.Subscribe("foo", "bar", "baz")
 
 	fooS, err := msh.Subscribers("foo")
-	assert.NoError(err)
+	assert.OK(err)
 	assert.Length(fooS, 2)
-	assert.Contains(fooS, "bar")
-	assert.Contains(fooS, "baz")
+	assert.Contents("bar", fooS)
+	assert.Contents("baz", fooS)
 
 	// Unsubscribe baz.
 	msh.Unsubscribe("foo", "baz")
 
 	fooS, err = msh.Subscribers("foo")
-	assert.NoError(err)
+	assert.OK(err)
 	assert.Length(fooS, 1)
-	assert.Contains(fooS, "bar")
+	assert.Contents("bar", fooS)
 
-	assert.NoError(msh.Stop())
+	assert.OK(msh.Stop())
 }
 
 // TestInvalidSubscriptions verifies the invalid (un)subscriptions of cells.
@@ -372,24 +372,24 @@ func TestInvalidSubscriptions(t *testing.T) {
 		NewTestBehavior("foo"),
 		NewTestBehavior("bar"),
 	)
-	assert.NoError(err)
+	assert.OK(err)
 
 	err = msh.Subscribe("foo", "bar", "baz")
 	assert.ErrorMatch(err, ".*cannot find cell.*")
 
 	err = msh.Subscribe("foo", "bar")
-	assert.NoError(err)
+	assert.OK(err)
 
 	err = msh.Unsubscribe("foo", "bar", "baz")
 	assert.ErrorMatch(err, ".*cannot find cell.*")
 
 	err = msh.Unsubscribe("foo", "bar")
-	assert.NoError(err)
+	assert.OK(err)
 
 	err = msh.Unsubscribe("foo", "bar")
-	assert.NoError(err)
+	assert.OK(err)
 
-	assert.NoError(msh.Stop())
+	assert.OK(msh.Stop())
 }
 
 // TestSubscriberIDs verifies the retrieval of subscriber IDs.
@@ -402,27 +402,27 @@ func TestSubscriberIDs(t *testing.T) {
 		NewTestBehavior("bar"),
 		NewTestBehavior("baz"),
 	)
-	assert.NoError(err)
+	assert.OK(err)
 
 	err = msh.Subscribe("foo", "bar", "baz")
-	assert.NoError(err)
+	assert.OK(err)
 
 	subscriberIDs, err := msh.Subscribers("foo")
-	assert.NoError(err)
+	assert.OK(err)
 	assert.Length(subscriberIDs, 2)
 
 	subscriberIDs, err = msh.Subscribers("bar")
-	assert.NoError(err)
+	assert.OK(err)
 	assert.Length(subscriberIDs, 0)
 
 	err = msh.Unsubscribe("foo", "baz")
-	assert.NoError(err)
+	assert.OK(err)
 
 	subscriberIDs, err = msh.Subscribers("foo")
-	assert.NoError(err)
+	assert.OK(err)
 	assert.Length(subscriberIDs, 1)
 
-	assert.NoError(msh.Stop())
+	assert.OK(msh.Stop())
 }
 
 //--------------------
@@ -433,7 +433,7 @@ func waitEvents(assert *asserts.Asserts, msh *mesh.Mesh, id string) {
 	pl, plc := event.NewReplyPayload()
 	msh.Emit(id, event.New("send", pl))
 	_, err := plc.Wait(waitTimeout)
-	assert.NoError(err)
+	assert.OK(err)
 }
 
 type TestBehavior struct {

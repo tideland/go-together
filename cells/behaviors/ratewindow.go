@@ -78,7 +78,7 @@ func (b *rateWindowBehavior) Terminate() error {
 func (b *rateWindowBehavior) Process(evt *event.Event) error {
 	switch evt.Topic() {
 	case event.TopicReset:
-		b.sink.Clear()
+		return b.sink.Clear()
 	default:
 		ok, err := b.matches(evt)
 		if err != nil {
@@ -87,7 +87,9 @@ func (b *rateWindowBehavior) Process(evt *event.Event) error {
 		if !ok {
 			return nil
 		}
-		b.sink.Push(evt)
+		if _, err = b.sink.Push(evt); err != nil {
+			return err
+		}
 		if b.sink.Len() == b.count {
 			// Got enough matches, check duration.
 			first, _ := b.sink.PeekFirst()
@@ -99,12 +101,16 @@ func (b *rateWindowBehavior) Process(evt *event.Event) error {
 				if err != nil {
 					return err
 				}
-				b.emitter.Broadcast(event.New(TopicRateWindow, pl))
+				if err = b.emitter.Broadcast(event.New(TopicRateWindow, pl)); err != nil {
+					return err
+				}
 			}
-			b.sink.PullFirst()
+			if _, err := b.sink.PullFirst(); err != nil {
+				return err
+			}
 		}
+		return nil
 	}
-	return nil
 }
 
 // Recover implements the cells.Behavior interface.

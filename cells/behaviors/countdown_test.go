@@ -30,7 +30,7 @@ func TestCountdownBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	sigc := asserts.MakeWaitChan()
 	msh := mesh.New()
-	defer msh.Stop()
+	defer assert.NoError(msh.Stop())
 
 	zeroer := func(accessor event.SinkAccessor) (*event.Event, int, error) {
 		at := accessor.Len()
@@ -45,11 +45,11 @@ func TestCountdownBehavior(t *testing.T) {
 		return nil
 	}
 
-	msh.SpawnCells(
+	assert.NoError(msh.SpawnCells(
 		behaviors.NewCountdownBehavior("countdowner", 5, zeroer),
 		behaviors.NewConditionBehavior("conditioner", tester, processor),
-	)
-	msh.Subscribe("countdowner", "conditioner")
+	))
+	assert.NoError(msh.Subscribe("countdowner", "conditioner"))
 
 	countdown := func(ct int) {
 		for i := 0; i < ct; i++ {

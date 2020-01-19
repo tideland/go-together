@@ -34,7 +34,7 @@ func TestAggregatorBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	generator := generators.New(generators.FixedRand())
 	msh := mesh.New()
-	defer msh.Stop()
+	defer assert.NoError(msh.Stop())
 
 	aggregate := func(pl *event.Payload, evt *event.Event) (*event.Payload, error) {
 		topic := evt.Topic()
@@ -43,17 +43,17 @@ func TestAggregatorBehavior(t *testing.T) {
 		return event.NewPayload("topics", topics), nil
 	}
 
-	msh.SpawnCells(behaviors.NewAggregatorBehavior("aggregator", event.NewPayload(), aggregate))
+	assert.NoError(msh.SpawnCells(behaviors.NewAggregatorBehavior("aggregator", event.NewPayload(), aggregate)))
 
 	for i := 0; i < 50; i++ {
 		topic := generator.Word()
-		msh.Emit("aggregator", event.New(topic))
+		assert.NoError(msh.Emit("aggregator", event.New(topic)))
 	}
 
 	pl, plc := event.NewReplyPayload()
 	evt := event.New(event.TopicStatus, pl)
 
-	msh.Emit("aggregator", evt)
+	assert.NoError(msh.Emit("aggregator", evt))
 
 	select {
 	case pl := <-plc:

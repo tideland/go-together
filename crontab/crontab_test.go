@@ -18,7 +18,6 @@ import (
 
 	"tideland.dev/go/audit/asserts"
 	"tideland.dev/go/together/crontab"
-	"tideland.dev/go/together/notifier"
 )
 
 //--------------------
@@ -39,9 +38,6 @@ func TestSubmitStatusRevoke(t *testing.T) {
 		return nil
 	})
 	assert.NoError(err)
-	status, err := crontab.Status("foo-1")
-	assert.NoError(err)
-	assert.Equal(status, notifier.Working)
 	err = crontab.Revoke("foo-1")
 	assert.NoError(err)
 	time.Sleep((500 * time.Millisecond))
@@ -142,13 +138,6 @@ waiting:
 	}
 	assert.About(float64(<-oneDiffC), 0.0, oneDiffExtend)
 	assert.Equal(count, 2)
-
-	status, err := crontab.Status("bar-1")
-	assert.NoError(err)
-	assert.Equal(status, notifier.Stopped)
-	status, err = crontab.Status("bar-2")
-	assert.NoError(err)
-	assert.Equal(status, notifier.Stopped)
 
 	err = crontab.Revoke("bar-1")
 	assert.NoError(err)

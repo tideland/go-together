@@ -33,7 +33,7 @@ func TestConditionBehavior(t *testing.T) {
 	size := 1000
 	sigc := asserts.MakeMultiWaitChan(size)
 	msh := mesh.New()
-	defer msh.Stop()
+	defer assert.NoError(msh.Stop())
 
 	tester := func(evt *event.Event) bool {
 		return evt.Topic() == "end"
@@ -43,13 +43,13 @@ func TestConditionBehavior(t *testing.T) {
 		return nil
 	}
 
-	msh.SpawnCells(behaviors.NewConditionBehavior("condition", tester, processor))
+	assert.NoError(msh.SpawnCells(behaviors.NewConditionBehavior("condition", tester, processor)))
 
 	topics := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "end"}
 
 	for i := 0; i < size; i++ {
 		topic := generator.OneStringOf(topics...)
-		msh.Emit("condition", event.New(topic))
+		assert.NoError(msh.Emit("condition", event.New(topic)))
 	}
 
 	assert.Wait(sigc, "end", time.Second)

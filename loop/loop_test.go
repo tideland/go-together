@@ -396,7 +396,11 @@ func ExampleRecoverer() {
 		}
 		return nil
 	}
-	loop.Go(worker, loop.WithRecoverer(recoverer))
+	l, err := loop.Go(worker, loop.WithRecoverer(recoverer))
+	if err != nil {
+		panic(err)
+	}
+	_ = l.Stop()
 }
 
 // EOF

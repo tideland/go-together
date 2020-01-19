@@ -58,8 +58,7 @@ func (b *countdownBehavior) Init(emitter mesh.Emitter) error {
 
 // Terminate the behavior.
 func (b *countdownBehavior) Terminate() error {
-	b.sink.Clear()
-	return nil
+	return b.sink.Clear()
 }
 
 // Process puts the received events into a sink. When reaching t the
@@ -69,8 +68,8 @@ func (b *countdownBehavior) Process(evt *event.Event) error {
 	switch evt.Topic() {
 	case event.TopicReset:
 		t := evt.Payload().At("t").AsInt(b.t)
-		b.sink.Clear()
 		b.t = t
+		return b.sink.Clear()
 	default:
 		if b.t <= 0 {
 			return nil
@@ -85,12 +84,14 @@ func (b *countdownBehavior) Process(evt *event.Event) error {
 			if err != nil {
 				return err
 			}
-			b.sink.Clear()
 			b.t = t
+			if err = b.sink.Clear(); err != nil {
+				return err
+			}
 			return b.emitter.Broadcast(zevt)
 		}
+		return nil
 	}
-	return nil
 }
 
 // Recover from an error.

@@ -22,14 +22,6 @@ import (
 )
 
 //--------------------
-// CONSTANTS
-//--------------------
-
-const (
-	timeout = 5 * time.Second
-)
-
-//--------------------
 // TESTS
 //--------------------
 
@@ -41,12 +33,12 @@ func TestPureGoOK(t *testing.T) {
 		done = true
 		return err
 	}))
-	assert.NoError(err)
+	assert.OK(err)
 	assert.NotNil(act)
 
-	assert.NoError(act.Stop())
-	assert.NoError(act.Err())
-	assert.True(done)
+	assert.OK(act.Stop())
+	assert.OK(act.Err())
+	assert.OK(done)
 }
 
 // TestPureError is simply starting and stopping an Actor.
@@ -56,7 +48,7 @@ func TestPureError(t *testing.T) {
 	act, err := actor.Go(actor.WithFinalizer(func(err error) error {
 		return errors.New("damn")
 	}))
-	assert.NoError(err)
+	assert.OK(err)
 	assert.NotNil(act)
 
 	assert.ErrorMatch(act.Stop(), "damn")
@@ -69,54 +61,52 @@ func TestWithContext(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	ctx, cancel := context.WithCancel(context.Background())
 	act, err := actor.Go(actor.WithContext(ctx))
-	assert.NoError(err)
+	assert.OK(err)
 	assert.NotNil(act)
 
 	cancel()
-	assert.NoError(act.Err())
+	assert.OK(act.Err())
 }
 
 // TestSync tests synchronous calls.
 func TestSync(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	act, err := actor.Go()
-	assert.NoError(err)
-	defer act.Stop()
+	assert.OK(err)
 
 	counter := 0
 
 	for i := 0; i < 5; i++ {
-		err := act.DoSync(func() {
+		assert.OK(act.DoSync(func() {
 			counter++
-		})
-		assert.Nil(err)
+		}))
 	}
 
 	assert.Equal(counter, 5)
+	assert.OK(act.Stop())
 }
 
 // TestTimeout tests timout error of a synchronous Action.
 func TestTimeout(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	act, err := actor.Go()
-	assert.NoError(err)
-	defer act.Stop()
+	assert.OK(err)
 
 	// Scenario: Timeout is shorter than needed time, so error
 	// is returned.
 	err = act.DoSyncTimeout(func() {
-		time.Sleep(time.Second)
+		time.Sleep(5 * time.Second)
 	}, 500*time.Millisecond)
 
-	assert.ErrorMatch(err, ".*timed out.*")
+	assert.ErrorMatch(err, ".*timeout.*")
+	assert.OK(act.Stop())
 }
 
 // TestAsyncWithQueueCap tests running multiple calls asynchronously.
 func TestAsyncWithQueueCap(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	act, err := actor.Go(actor.WithQueueCap(128))
-	assert.NoError(err)
-	defer act.Stop()
+	assert.OK(err)
 
 	sigs := make(chan struct{}, 1)
 	done := make(chan struct{}, 1)
@@ -137,10 +127,10 @@ func TestAsyncWithQueueCap(t *testing.T) {
 	// Now start asynchrounous calls.
 	start := time.Now()
 	for i := 0; i < 128; i++ {
-		act.DoAsync(func() {
+		assert.OK(act.DoAsync(func() {
 			time.Sleep(5 * time.Millisecond)
 			sigs <- struct{}{}
-		})
+		}))
 	}
 	enqueued := time.Since(start)
 
@@ -148,7 +138,8 @@ func TestAsyncWithQueueCap(t *testing.T) {
 	<-done
 	duration := time.Since(start)
 
-	assert.True((duration - 640*time.Millisecond) > enqueued)
+	assert.OK((duration - 640*time.Millisecond) > enqueued)
+	assert.OK(act.Stop())
 }
 
 // TestRecoveryOK tests handling panics successfully.
@@ -163,22 +154,22 @@ func TestRecoveryOK(t *testing.T) {
 		return nil
 	}
 	act, err := actor.Go(actor.WithRecoverer(recoverer))
-	assert.NoError(err)
-	defer act.Stop()
+	assert.OK(err)
 
 	err = act.DoSyncTimeout(func() {
 		counter++
 		// Will crash on first call.
 		print(counter / (counter - 1))
 	}, time.Second)
-	assert.ErrorMatch(err, ".*timed out.*")
+	assert.ErrorMatch(err, ".*timeout.*")
 	<-done
-	assert.True(recovered)
+	assert.OK(recovered)
 	err = act.DoSync(func() {
 		counter++
 	})
-	assert.NoError(err)
+	assert.OK(err)
 	assert.Equal(counter, 2)
+	assert.OK(act.Stop())
 }
 
 // TestRecoveryError tests handling panics with error.
@@ -193,8 +184,7 @@ func TestRecoveryError(t *testing.T) {
 		return errors.New("ouch")
 	}
 	act, err := actor.Go(actor.WithRecoverer(recoverer))
-	assert.NoError(err)
-	defer act.Stop()
+	assert.OK(err)
 
 	err = act.DoSyncTimeout(func() {
 		counter++
@@ -203,11 +193,11 @@ func TestRecoveryError(t *testing.T) {
 	}, time.Second)
 	assert.ErrorMatch(err, "ouch")
 	<-done
-	assert.True(recovered)
+	assert.OK(recovered)
 	err = act.DoSync(func() {
 		counter++
 	})
-	assert.ErrorMatch(err, "ouch")
+	assert.ErrorMatch(act.Stop(), "ouch")
 }
 
 // EOF

@@ -56,8 +56,7 @@ func (b *collectorBehavior) Init(emitter mesh.Emitter) error {
 
 // Terminate the behavior.
 func (b *collectorBehavior) Terminate() error {
-	b.sink.Clear()
-	return nil
+	return b.sink.Clear()
 }
 
 // Process collects, processes, and re-emits events.
@@ -72,7 +71,9 @@ func (b *collectorBehavior) Process(evt *event.Event) error {
 	case event.TopicReset:
 		return b.sink.Clear()
 	default:
-		b.sink.Push(evt)
+		if _, err := b.sink.Push(evt); err != nil {
+			return err
+		}
 		return b.emitter.Broadcast(evt)
 	}
 }

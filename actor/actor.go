@@ -14,9 +14,9 @@ package actor // import "tideland.dev/go/together/actor"
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
+	"tideland.dev/go/together/fuse"
 	"tideland.dev/go/trace/failure"
 )
 
@@ -58,7 +58,7 @@ type Finalizer func(err error) error
 type Actor struct {
 	ctx          context.Context
 	cancel       func()
-	done         sync.WaitGroup
+	signal       *fuse.Signal
 	asyncActions chan Action
 	syncActions  chan Action
 	recoverer    Recoverer
@@ -70,9 +70,9 @@ type Actor struct {
 func Go(options ...Option) (*Actor, error) {
 	// Init with options.
 	act := &Actor{
-		syncActions: make(chan Action, 1),
+		signal:      fuse.NewSignal(),
+		syncActions: make(chan Action),
 	}
-	act.done.Add(1)
 	for _, option := range options {
 		if err := option(act); err != nil {
 			act.err.Set(err)
@@ -99,7 +99,11 @@ func Go(options ...Option) (*Actor, error) {
 		}
 	}
 	// Create loop with its options.
+	act.signal.Notify(fuse.Starting)
 	go act.backend()
+	if err := act.signal.Wait(fuse.Ready, DefaultTimeout); err != nil {
+		return nil, err
+	}
 	return act, nil
 }
 
@@ -136,7 +140,7 @@ func (act *Actor) DoSyncTimeout(action Action, timeout time.Duration) error {
 		if !act.err.IsNil() {
 			return act.err.Get()
 		}
-		return failure.New("synchronous actor do timed out")
+		return failure.New("synchronous actor do: timeout")
 	}
 	return nil
 }
@@ -152,7 +156,9 @@ func (act *Actor) Stop() error {
 		return act.err.Get()
 	}
 	act.cancel()
-	act.done.Wait()
+	if err := act.signal.Wait(fuse.Stopped, DefaultTimeout); err != nil {
+		return err
+	}
 	return act.err.Get()
 }
 
@@ -160,8 +166,9 @@ func (act *Actor) Stop() error {
 func (act *Actor) backend() {
 	defer func() {
 		act.err.Set(act.finalizer(act.err.Get()))
-		act.done.Done()
+		act.signal.Notify(fuse.Stopped)
 	}()
+	act.signal.Notify(fuse.Ready)
 	for act.loop() {
 	}
 }
@@ -184,9 +191,12 @@ func (act *Actor) loop() (ok bool) {
 			ok = false
 		}
 	}()
+	runs := 0
 	for {
+		runs++
 		select {
 		case <-act.ctx.Done():
+			act.signal.Notify(fuse.Stopping)
 			return
 		case action := <-act.asyncActions:
 			action()

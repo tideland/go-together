@@ -30,7 +30,7 @@ func TestBroadcasterBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	sigc := asserts.MakeWaitChan()
 	msh := mesh.New()
-	defer msh.Stop()
+	defer assert.NoError(msh.Stop())
 
 	mktester := func() behaviors.ConditionTester {
 		counter := 0
@@ -44,16 +44,16 @@ func TestBroadcasterBehavior(t *testing.T) {
 		return nil
 	}
 
-	msh.SpawnCells(
+	assert.NoError(msh.SpawnCells(
 		behaviors.NewBroadcasterBehavior("broadcast"),
 		behaviors.NewConditionBehavior("test-a", mktester(), processor),
 		behaviors.NewConditionBehavior("test-b", mktester(), processor),
-	)
-	msh.Subscribe("broadcast", "test-a", "test-b")
+	))
+	assert.NoError(msh.Subscribe("broadcast", "test-a", "test-b"))
 
-	msh.Emit("broadcast", event.New("test"))
-	msh.Emit("broadcast", event.New("test"))
-	msh.Emit("broadcast", event.New("test"))
+	assert.NoError(msh.Emit("broadcast", event.New("test")))
+	assert.NoError(msh.Emit("broadcast", event.New("test")))
+	assert.NoError(msh.Emit("broadcast", event.New("test")))
 
 	assert.Wait(sigc, true, time.Second)
 	assert.Wait(sigc, true, time.Second)

@@ -60,17 +60,18 @@ func (b *sequenceBehavior) Init(emitter mesh.Emitter) error {
 
 // Terminate the behavior.
 func (b *sequenceBehavior) Terminate() error {
-	b.sink.Clear()
-	return nil
+	return b.sink.Clear()
 }
 
 // Process ...
 func (b *sequenceBehavior) Process(evt *event.Event) error {
 	switch evt.Topic() {
 	case event.TopicReset:
-		b.sink.Clear()
+		return b.sink.Clear()
 	default:
-		b.sink.Push(evt)
+		if _, err := b.sink.Push(evt); err != nil {
+			return err
+		}
 		matches := b.matches(b.sink)
 		switch matches {
 		case event.CriterionDone:
@@ -79,22 +80,21 @@ func (b *sequenceBehavior) Process(evt *event.Event) error {
 			if err != nil {
 				return err
 			}
-			b.emitter.Broadcast(event.New(TopicSequence, pl))
 			b.sink = event.NewSink(0)
+			return b.emitter.Broadcast(event.New(TopicSequence, pl))
 		case event.CriterionKeep:
 			// So far ok.
+			return nil
 		default:
 			// Have to start from beginning.
-			b.sink.Clear()
+			return b.sink.Clear()
 		}
 	}
-	return nil
 }
 
 // Recover implements the cells.Behavior interface.
 func (b *sequenceBehavior) Recover(err interface{}) error {
-	b.sink.Clear()
-	return nil
+	return b.sink.Clear()
 }
 
 // EOF

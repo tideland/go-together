@@ -79,7 +79,9 @@ func (msh *Mesh) StopCells(ids ...string) error {
 		if err := msh.cells.unsubscribeFromAll(id); err != nil {
 			return err
 		}
-		return msh.cells.remove(id)
+		if err := msh.cells.remove(id); err != nil {
+			return err
+		}
 	}
 	return nil
 }

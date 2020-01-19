@@ -89,7 +89,7 @@ func (b *fsmBehavior) Process(evt *event.Event) error {
 	switch evt.Topic() {
 	case TopicFSMStatus:
 		// Emit information.
-		b.emitter.Broadcast(event.New(
+		return b.emitter.Broadcast(event.New(
 			event.TopicStatus,
 			"info", b.status.Info,
 			"done", b.status.Done(),
@@ -98,8 +98,8 @@ func (b *fsmBehavior) Process(evt *event.Event) error {
 	default:
 		// Process event.
 		b.status = b.status.Process(b.emitter, evt)
+		return b.status.Error
 	}
-	return b.status.Error
 }
 
 // Recover from an error.

@@ -186,7 +186,7 @@ func TestSinkAnalyzer(t *testing.T) {
 	filterSink, err := analyzer.Filter(threechecker)
 	assert.NoError(err)
 	assert.True(filterSink.Len() < sink.Len(), "less events with topic 'three' than total number")
-	filterSink, err = analyzer.Filter(ferrchecker)
+	_, err = analyzer.Filter(ferrchecker)
 	assert.ErrorMatch(err, "ouch", "error is returned correctly")
 
 	// Check matching.
@@ -197,6 +197,7 @@ func TestSinkAnalyzer(t *testing.T) {
 	assert.True(ok, "all events in filterSink do have topic 'three'")
 	ok, err = event.NewSinkAnalyzer(filterSink).Match(ferrchecker)
 	assert.ErrorMatch(err, "ouch", "error is returned correctly")
+	assert.False(ok)
 
 	// Check folding.
 	testCount := 0
@@ -216,7 +217,7 @@ func TestSinkAnalyzer(t *testing.T) {
 	assert.NoError(err)
 	count := pl.At("count").AsInt(0)
 	assert.Equal(count, testCount, "accumulator has been updated correctly")
-	pl, err = analyzer.Fold(pl, ferrfolder)
+	_, err = analyzer.Fold(pl, ferrfolder)
 	assert.ErrorMatch(err, "ouch", "error is returned correctly")
 
 	// Check total duration.
@@ -240,7 +241,7 @@ func TestSinkAnalyzer(t *testing.T) {
 	// Check minimum/maximum duration.
 	durations := []time.Duration{}
 	timestamp := time.Time{}
-	sink.Do(func(index int, event *event.Event) error {
+	assert.NoError(sink.Do(func(index int, event *event.Event) error {
 		if index == 0 {
 			timestamp = event.Timestamp()
 			return nil
@@ -249,7 +250,7 @@ func TestSinkAnalyzer(t *testing.T) {
 		durations = append(durations, duration)
 		timestamp = event.Timestamp()
 		return nil
-	})
+	}))
 	sort.Slice(durations, func(i, j int) bool {
 		return durations[i] < durations[j]
 	})
@@ -287,6 +288,7 @@ func TestSinkAnalyzer(t *testing.T) {
 	}
 	payloads, err = analyzer.TopicFolds(terrfolder)
 	assert.ErrorMatch(err, "ouch", "error is returned correctly")
+	assert.Nil(payloads)
 }
 
 //--------------------

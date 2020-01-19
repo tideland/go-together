@@ -94,6 +94,7 @@ func (b *evaluatorBehavior) Process(evt *event.Event) error {
 		b.ratings = nil
 		b.sortedRatings = nil
 		b.evaluation = evaluation{}
+		return nil
 	default:
 		// Evaluate event and collect rating.
 		rating, err := b.evaluate(evt)
@@ -110,7 +111,7 @@ func (b *evaluatorBehavior) Process(evt *event.Event) error {
 		}
 		// Evaluate ratings.
 		b.evaluateRatings()
-		b.emitter.Broadcast(event.New(
+		return b.emitter.Broadcast(event.New(
 			TopicEvaluation,
 			"count", b.evaluation.count,
 			"min-rating", b.evaluation.minRating,
@@ -119,7 +120,6 @@ func (b *evaluatorBehavior) Process(evt *event.Event) error {
 			"med-rating", b.evaluation.medRating,
 		))
 	}
-	return nil
 }
 
 // Recover from an error.

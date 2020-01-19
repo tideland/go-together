@@ -231,7 +231,8 @@ func (sa *SinkAnalyzer) Filter(filter SinkFilter) (SinkAccessor, error) {
 			return err
 		}
 		if ok {
-			accessor.Push(evt)
+			_, err = accessor.Push(evt)
+			return err
 		}
 		return nil
 	}
@@ -300,7 +301,9 @@ func (sa *SinkAnalyzer) MinMaxDuration() (time.Duration, time.Duration) {
 		lastTimestamp = evt.Timestamp()
 		return nil
 	}
-	sa.accessor.Do(doer)
+	if err := sa.accessor.Do(doer); err != nil {
+		panic(err)
+	}
 	return minDuration, maxDuration
 }
 
@@ -311,7 +314,9 @@ func (sa *SinkAnalyzer) TopicQuantities() map[string]int {
 		topics[evt.Topic()] = topics[evt.Topic()] + 1
 		return nil
 	}
-	sa.accessor.Do(doer)
+	if err := sa.accessor.Do(doer); err != nil {
+		panic(err)
+	}
 	return topics
 }
 

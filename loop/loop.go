@@ -15,18 +15,8 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"tideland.dev/go/together/fuse"
-)
-
-//--------------------
-// CONSTANTS
-//--------------------
-
-const (
-	// timeout for loop action waitings.
-	timeout = 5 * time.Second
 )
 
 //--------------------
@@ -62,6 +52,7 @@ type Finalizer func(err error) error
 type Loop struct {
 	ctx       context.Context
 	cancel    func()
+	done      sync.WaitGroup
 	done      sync.WaitGroup
 	worker    Worker
 	recoverer Recoverer

@@ -29,7 +29,7 @@ import (
 func TestCallbackBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	msh := mesh.New()
-	defer msh.Stop()
+	defer assert.NoError(msh.Stop())
 
 	cbdA := []string{}
 	cbfA := func(emitter mesh.Emitter, evt *event.Event) error {
@@ -49,11 +49,11 @@ func TestCallbackBehavior(t *testing.T) {
 		return nil
 	}
 
-	msh.SpawnCells(behaviors.NewCallbackBehavior("callback", cbfA, cbfB, cbfC))
+	assert.NoError(msh.SpawnCells(behaviors.NewCallbackBehavior("callback", cbfA, cbfB, cbfC)))
 
-	msh.Emit("callback", event.New("foo"))
-	msh.Emit("callback", event.New("bar"))
-	msh.Emit("callback", event.New("baz"))
+	assert.NoError(msh.Emit("callback", event.New("foo")))
+	assert.NoError(msh.Emit("callback", event.New("bar")))
+	assert.NoError(msh.Emit("callback", event.New("baz")))
 
 	assert.Wait(sigc, true, time.Second)
 	assert.Equal(cbdA, []string{"foo", "bar", "baz"})

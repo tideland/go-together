@@ -18,8 +18,8 @@ import (
 	"time"
 
 	"tideland.dev/go/together/actor"
+	"tideland.dev/go/together/fuse"
 	"tideland.dev/go/together/loop"
-	"tideland.dev/go/together/notifier"
 )
 
 //--------------------
@@ -64,50 +64,40 @@ func goGrontab() {
 
 // cronjob is responsible to run one job.
 type cronjob struct {
-	id        string
-	start     *time.Time
-	interval  *time.Duration
-	job       func() error
-	loop      *loop.Loop
-	signalbox *notifier.Signalbox
-	rs        loop.Reasons
+	id       string
+	start    *time.Time
+	interval *time.Duration
+	job      func() error
+	loop     *loop.Loop
+	rs       fuse.Reasons
 }
 
 // newCronjob creates a new cronjob and starts its goroutine.
 func newCronjob(id string, s *time.Time, i *time.Duration, j func() error) *cronjob {
 	cj := &cronjob{
-		id:        id,
-		start:     s,
-		interval:  i,
-		job:       j,
-		signalbox: notifier.NewSignalbox(),
-		rs:        loop.MakeReasons(),
+		id:       id,
+		start:    s,
+		interval: i,
+		job:      j,
 	}
 	l, err := loop.Go(
 		cj.worker,
 		loop.WithRecoverer(cj.recoverer),
-		loop.WithSignalbox(cj.signalbox),
 	)
 	if err != nil {
 		panic("start cronjob: " + err.Error())
 	}
 	cj.loop = l
-	<-cj.signalbox.Done(notifier.Working)
 	return cj
 }
 
 // stop ends the cronjob goroutine.
 func (cj *cronjob) stop() error {
-	return cj.loop.Stop(nil)
-}
-
-// status returns the status of the cronjob.
-func (cj *cronjob) status() notifier.Status {
-	return cj.loop.Signaler().Status()
+	return cj.loop.Stop()
 }
 
 // worker runs the cronjob.
-func (cj *cronjob) worker(c *notifier.Closer) error {
+func (cj *cronjob) worker(lt loop.Terminator) error {
 	// Init.
 	var interval time.Duration
 	if cj.start != nil {
@@ -118,7 +108,7 @@ func (cj *cronjob) worker(c *notifier.Closer) error {
 	// Loop.
 	for {
 		select {
-		case <-c.Done():
+		case <-lt.Done():
 			return nil
 		case <-time.After(interval):
 			if err := cj.job(); err != nil {
@@ -136,7 +126,7 @@ func (cj *cronjob) worker(c *notifier.Closer) error {
 
 // recoverer allows the cronjob to survive panics.
 func (cj *cronjob) recoverer(reason interface{}) error {
-	cj.rs = cj.rs.Append(reason)
+	cj.rs.Append(reason)
 	if cj.rs.Frequency(5, 10*time.Millisecond) {
 		return fmt.Errorf("too high error frequency: %v", cj.rs)
 	}
@@ -154,15 +144,14 @@ func (cj *cronjob) recoverer(reason interface{}) error {
 func SubmitAt(id string, at time.Time, j func() error) error {
 	goGrontab()
 	var err error
-	if actErr := ct.act.DoSync(func() error {
+	if aerr := ct.act.DoSync(func() {
 		if ct.jobs[id] != nil {
 			err = fmt.Errorf("job ID '%s' already exists", id)
-			return nil
+			return
 		}
 		ct.jobs[id] = newCronjob(id, &at, nil, j)
-		return nil
-	}); actErr != nil {
-		return actErr
+	}); aerr != nil {
+		return aerr
 	}
 	return err
 }
@@ -171,15 +160,14 @@ func SubmitAt(id string, at time.Time, j func() error) error {
 func SubmitEvery(id string, every time.Duration, j func() error) error {
 	goGrontab()
 	var err error
-	if actErr := ct.act.DoSync(func() error {
+	if aerr := ct.act.DoSync(func() {
 		if ct.jobs[id] != nil {
 			err = fmt.Errorf("job ID '%s' already exists", id)
-			return nil
+			return
 		}
 		ct.jobs[id] = newCronjob(id, nil, &every, j)
-		return nil
-	}); actErr != nil {
-		return actErr
+	}); aerr != nil {
+		return aerr
 	}
 	return err
 }
@@ -188,15 +176,14 @@ func SubmitEvery(id string, every time.Duration, j func() error) error {
 func SubmitAtEvery(id string, at time.Time, every time.Duration, j func() error) error {
 	goGrontab()
 	var err error
-	if actErr := ct.act.DoSync(func() error {
+	if aerr := ct.act.DoSync(func() {
 		if ct.jobs[id] != nil {
 			err = fmt.Errorf("job ID '%s' already exists", id)
-			return nil
+			return
 		}
 		ct.jobs[id] = newCronjob(id, &at, &every, j)
-		return nil
-	}); actErr != nil {
-		return actErr
+	}); aerr != nil {
+		return aerr
 	}
 	return err
 }
@@ -211,50 +198,30 @@ func List() ([]string, error) {
 	goGrontab()
 	var ids []string
 	var err error
-	if actErr := ct.act.DoSync(func() error {
+	if aerr := ct.act.DoSync(func() {
 		for id := range ct.jobs {
 			ids = append(ids, id)
 		}
-		return nil
-	}); actErr != nil {
-		return ids, actErr
+	}); aerr != nil {
+		return ids, aerr
 	}
 	sort.Strings(ids)
 	return ids, err
-}
-
-// Status returns the status of a cronjob.
-func Status(id string) (notifier.Status, error) {
-	goGrontab()
-	var status notifier.Status
-	var err error
-	if actErr := ct.act.DoSync(func() error {
-		if job, ok := ct.jobs[id]; ok {
-			status = job.status()
-			return nil
-		}
-		err = fmt.Errorf("job ID '%s' does not exist", id)
-		return nil
-	}); actErr != nil {
-		return notifier.Unknown, actErr
-	}
-	return status, err
 }
 
 // Revoke stops a cronjob and removes it from the table.
 func Revoke(id string) error {
 	goGrontab()
 	var err error
-	if actErr := ct.act.DoSync(func() error {
+	if aerr := ct.act.DoSync(func() {
 		if job, ok := ct.jobs[id]; ok {
 			delete(ct.jobs, id)
 			err = job.stop()
-			return nil
+			return
 		}
 		err = fmt.Errorf("job ID '%s' does not exist", id)
-		return nil
-	}); actErr != nil {
-		return actErr
+	}); aerr != nil {
+		return aerr
 	}
 	return err
 }
