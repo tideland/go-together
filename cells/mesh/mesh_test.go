@@ -229,7 +229,7 @@ func TestBroadcastEvents(t *testing.T) {
 	assertData := func(id string) {
 		pl, plc := event.NewReplyPayload()
 
-		msh.Emit(id, event.New("send", pl))
+		assert.OK(msh.Emit(id, event.New("send", pl)))
 
 		plr, err := plc.Wait(waitTimeout)
 
@@ -246,7 +246,7 @@ func TestBroadcastEvents(t *testing.T) {
 	)
 	assert.OK(err)
 
-	msh.Broadcast(event.New("set", "a", 1, "b", 2, "c", 3))
+	assert.OK(msh.Broadcast(event.New("set", "a", 1, "b", 2, "c", 3)))
 
 	assertData("foo")
 	assertData("bar")
@@ -267,10 +267,10 @@ func TestBehaviorEmit(t *testing.T) {
 	)
 	assert.OK(err)
 
-	msh.Subscribe("foo", "bar", "baz")
+	assert.OK(msh.Subscribe("foo", "bar", "baz"))
 
-	msh.Emit("foo", event.New("emit", "to", "bar", "value", 1234))
-	msh.Emit("foo", event.New("emit", "to", "baz", "value", 4321))
+	assert.OK(msh.Emit("foo", event.New("emit", "to", "bar", "value", 1234)))
+	assert.OK(msh.Emit("foo", event.New("emit", "to", "baz", "value", 4321)))
 
 	assertSend := func(id string, value int) {
 		pl, plc := event.NewReplyPayload()
@@ -299,7 +299,7 @@ func TestSubscribe(t *testing.T) {
 	)
 	assert.OK(err)
 
-	msh.Subscribe("foo", "bar", "baz")
+	assert.OK(msh.Subscribe("foo", "bar", "baz"))
 
 	// Directly ask mesh.
 	fooS, err := msh.Subscribers("foo")
@@ -309,21 +309,21 @@ func TestSubscribe(t *testing.T) {
 	assert.Contents("baz", fooS)
 
 	// Send event to store subscribers
-	msh.Emit("foo", event.New("subscribers"))
+	assert.OK(msh.Emit("foo", event.New("subscribers")))
 	pl, plc := event.NewReplyPayload()
-	msh.Emit("foo", event.New("send", pl))
+	assert.OK(msh.Emit("foo", event.New("send", pl)))
 	plr, err := plc.Wait(waitTimeout)
 	assert.OK(err)
 	assert.Equal(plr.At("bar").AsInt(0), 1)
 	assert.Equal(plr.At("baz").AsInt(0), 1)
 
 	// Set additional values and let emit length.
-	msh.Emit("foo", event.New("set", "a", 1, "b", 1234))
-	msh.Emit("foo", event.New("length"))
+	assert.OK(msh.Emit("foo", event.New("set", "a", 1, "b", 1234)))
+	assert.OK(msh.Emit("foo", event.New("length")))
 	waitEvents(assert, msh, "foo")
 
 	// Ask bar for received length.
-	msh.Emit("bar", event.New("send", pl))
+	assert.OK(msh.Emit("bar", event.New("send", pl)))
 	plr, err = plc.Wait(waitTimeout)
 	assert.OK(err)
 	assert.Equal(plr.At("length").AsInt(0), 4)
@@ -344,7 +344,7 @@ func TestUnsubscribe(t *testing.T) {
 	assert.OK(err)
 
 	// Subscribe bar and baz, test both.
-	msh.Subscribe("foo", "bar", "baz")
+	assert.OK(msh.Subscribe("foo", "bar", "baz"))
 
 	fooS, err := msh.Subscribers("foo")
 	assert.OK(err)
