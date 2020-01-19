@@ -14,10 +14,17 @@ package loop // import "tideland.dev/go/together/loop"
 import (
 	"context"
 	"fmt"
-	"sync"
+	"time"
 
 	"tideland.dev/go/together/fuse"
 )
+
+//--------------------
+// CONSTANTS
+//--------------------
+
+// timeout defines the time to wait for signals.
+const timeout = 5 * time.Second
 
 //--------------------
 // FUNCTION TYPES
@@ -52,8 +59,7 @@ type Finalizer func(err error) error
 type Loop struct {
 	ctx       context.Context
 	cancel    func()
-	done      sync.WaitGroup
-	done      sync.WaitGroup
+	signal    *fuse.Signal
 	worker    Worker
 	recoverer Recoverer
 	finalizer Finalizer
@@ -65,9 +71,9 @@ type Loop struct {
 func Go(worker Worker, options ...Option) (*Loop, error) {
 	// Init with default values.
 	l := &Loop{
+		signal: fuse.NewSignal(),
 		worker: worker,
 	}
-	l.done.Add(1)
 	for _, option := range options {
 		if err := option(l); err != nil {
 			return nil, err
@@ -90,7 +96,11 @@ func Go(worker Worker, options ...Option) (*Loop, error) {
 		}
 	}
 	// Create loop with its options.
+	l.signal.Notify(fuse.Starting)
 	go l.backend()
+	if err := l.signal.Wait(fuse.Ready, timeout); err != nil {
+		return nil, err
+	}
 	return l, nil
 }
 
@@ -105,7 +115,9 @@ func (l *Loop) Stop() error {
 		return l.err.Get()
 	}
 	l.cancel()
-	l.done.Wait()
+	if err := l.signal.Wait(fuse.Stopped, timeout); err != nil {
+		return err
+	}
 	return l.err.Get()
 }
 
@@ -114,8 +126,9 @@ func (l *Loop) Stop() error {
 func (l *Loop) backend() {
 	defer func() {
 		l.err.Set(l.finalizer(l.err.Get()))
-		l.done.Done()
+		l.signal.Notify(fuse.Stopped)
 	}()
+	l.signal.Notify(fuse.Ready)
 	for l.wrapper() {
 	}
 }
@@ -136,6 +149,9 @@ func (l *Loop) wrapper() (ok bool) {
 		} else {
 			// Regular ending.
 			ok = false
+		}
+		if !ok {
+			l.signal.Notify(fuse.Stopping)
 		}
 	}()
 	l.err.Set(l.worker(l.ctx))

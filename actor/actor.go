@@ -190,13 +190,15 @@ func (act *Actor) loop() (ok bool) {
 			// Regular ending.
 			ok = false
 		}
+		if !ok {
+			act.signal.Notify(fuse.Stopping)
+		}
 	}()
 	runs := 0
 	for {
 		runs++
 		select {
 		case <-act.ctx.Done():
-			act.signal.Notify(fuse.Stopping)
 			return
 		case action := <-act.asyncActions:
 			action()
