@@ -30,24 +30,24 @@ func TestOnceBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	sigc := asserts.MakeWaitChan()
 	msh := mesh.New()
-	defer msh.Stop()
 
 	oneTimer := func(emitter mesh.Emitter, evt *event.Event) error {
 		topic := evt.Topic()
 		sigc <- topic
 		return emitter.Broadcast(event.New(topic + "/" + topic))
 	}
-	msh.SpawnCells(
+	assert.OK(msh.SpawnCells(
 		behaviors.NewOnceBehavior("first", oneTimer),
 		behaviors.NewOnceBehavior("second", oneTimer),
-	)
-	msh.Subscribe("first", "second")
+	))
+	assert.OK(msh.Subscribe("first", "second"))
 
-	msh.Emit("first", event.New("foo"))
-	msh.Emit("first", event.New("bar"))
+	assert.OK(msh.Emit("first", event.New("foo")))
+	assert.OK(msh.Emit("first", event.New("bar")))
 
 	assert.Wait(sigc, "foo", time.Second)
 	assert.Wait(sigc, "foo/foo", time.Second)
+	assert.OK(msh.Stop())
 }
 
 // EOF

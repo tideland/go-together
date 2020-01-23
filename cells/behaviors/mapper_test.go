@@ -30,7 +30,6 @@ import (
 func TestMapperBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	msh := mesh.New()
-	defer msh.Stop()
 
 	var wg sync.WaitGroup
 
@@ -54,17 +53,18 @@ func TestMapperBehavior(t *testing.T) {
 		return nil
 	}
 
-	msh.SpawnCells(
+	assert.OK(msh.SpawnCells(
 		behaviors.NewMapperBehavior("mapper", mapper),
 		behaviors.NewSimpleProcessorBehavior("processor", processor),
-	)
-	msh.Subscribe("mapper", "processor")
+	))
+	assert.OK(msh.Subscribe("mapper", "processor"))
 
 	wg.Add(3)
-	msh.Emit("mapper", event.New("a", "text", "abc"))
-	msh.Emit("mapper", event.New("b", "text", "def"))
-	msh.Emit("mapper", event.New("c", "text", "ghi"))
+	assert.OK(msh.Emit("mapper", event.New("a", "text", "abc")))
+	assert.OK(msh.Emit("mapper", event.New("b", "text", "def")))
+	assert.OK(msh.Emit("mapper", event.New("c", "text", "ghi")))
 	wg.Wait()
+	assert.OK(msh.Stop())
 }
 
 // EOF

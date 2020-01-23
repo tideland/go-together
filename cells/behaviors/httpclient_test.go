@@ -35,16 +35,15 @@ func TestHTTPClientBehaviorGet(t *testing.T) {
 	wa := initWebAsserter(assert)
 	sigc := asserts.MakeWaitChan()
 	msh := mesh.New()
-	defer msh.Stop()
 
 	trigger := func(emitter mesh.Emitter, evt *event.Event) error {
 		if evt.Payload().At("id").AsString("<unknown>") == "nested" {
-			emitter.Broadcast(event.New(event.TopicProcess))
+			assert.OK(emitter.Broadcast(event.New(event.TopicProcess)))
 		}
 		return nil
 	}
 	processor := func(accessor event.SinkAccessor) (*event.Payload, error) {
-		accessor.Do(func(index int, evt *event.Event) error {
+		assert.OK(accessor.Do(func(index int, evt *event.Event) error {
 			assert.Equal(evt.Topic(), behaviors.TopicHTTPGetReply)
 			assert.Equal(evt.Payload().At("status-code").AsInt(0), 200)
 			switch evt.Payload().At("id").AsString("-") {
@@ -67,23 +66,24 @@ func TestHTTPClientBehaviorGet(t *testing.T) {
 				assert.Equal(data.At("C", "2", "G").AsInt(0), 30)
 			}
 			return nil
-		})
+		}))
 		sigc <- accessor.Len()
 		return nil, nil
 	}
 
-	msh.SpawnCells(
+	assert.OK(msh.SpawnCells(
 		behaviors.NewHTTPClientBehavior("client"),
 		behaviors.NewSimpleProcessorBehavior("trigger", trigger),
 		behaviors.NewCollectorBehavior("collector", 10, processor),
-	)
-	msh.Subscribe("client", "collector", "trigger")
-	msh.Subscribe("trigger", "collector")
+	))
+	assert.OK(msh.Subscribe("client", "collector", "trigger"))
+	assert.OK(msh.Subscribe("trigger", "collector"))
 
-	msh.Emit("client", event.New(behaviors.TopicHTTPGet, "id", "simple", "url", wa.URL()+"/simple"))
-	msh.Emit("client", event.New(behaviors.TopicHTTPGet, "id", "nested", "url", wa.URL()+"/nested"))
+	assert.OK(msh.Emit("client", event.New(behaviors.TopicHTTPGet, "id", "simple", "url", wa.URL()+"/simple")))
+	assert.OK(msh.Emit("client", event.New(behaviors.TopicHTTPGet, "id", "nested", "url", wa.URL()+"/nested")))
 
 	assert.Wait(sigc, 2, time.Second)
+	assert.OK(msh.Stop())
 }
 
 //--------------------
@@ -106,7 +106,7 @@ func initSimpleHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add(environments.HeaderContentType, environments.ContentTypePlain)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Done!"))
+		_, _ = w.Write([]byte("Done!"))
 	}
 }
 
@@ -136,7 +136,7 @@ func initNestedHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add(environments.HeaderContentType, environments.ContentTypeJSON)
 		w.WriteHeader(http.StatusOK)
-		w.Write(b)
+		_, _ = w.Write(b)
 	}
 }
 

@@ -274,7 +274,7 @@ func TestBehaviorEmit(t *testing.T) {
 
 	assertSend := func(id string, value int) {
 		pl, plc := event.NewReplyPayload()
-		msh.Emit(id, event.New("send", pl))
+		assert.OK(msh.Emit(id, event.New("send", pl)))
 		plr, err := plc.Wait(waitTimeout)
 		assert.OK(err)
 		assert.Equal(plr.At("value").AsInt(0), value)
@@ -353,7 +353,7 @@ func TestUnsubscribe(t *testing.T) {
 	assert.Contents("baz", fooS)
 
 	// Unsubscribe baz.
-	msh.Unsubscribe("foo", "baz")
+	assert.OK(msh.Unsubscribe("foo", "baz"))
 
 	fooS, err = msh.Subscribers("foo")
 	assert.OK(err)
@@ -431,7 +431,7 @@ func TestSubscriberIDs(t *testing.T) {
 
 func waitEvents(assert *asserts.Asserts, msh *mesh.Mesh, id string) {
 	pl, plc := event.NewReplyPayload()
-	msh.Emit(id, event.New("send", pl))
+	assert.OK(msh.Emit(id, event.New("send", pl)))
 	_, err := plc.Wait(waitTimeout)
 	assert.OK(err)
 }
@@ -481,16 +481,16 @@ func (tb *TestBehavior) Process(evt *event.Event) error {
 	case "emit":
 		to := evt.Payload().At("to").AsString("<unknown>")
 		value := evt.Payload().At("value").AsInt(-1)
-		tb.emitter.Emit(to, event.New("set", "value", value))
+		return tb.emitter.Emit(to, event.New("set", "value", value))
 	case "subscribers":
 		ids := tb.emitter.Subscribers()
 		for _, id := range ids {
 			tb.datas[id] = 1
 		}
 	case "length":
-		tb.emitter.Broadcast(event.New("set", "length", len(tb.datas)))
+		return tb.emitter.Broadcast(event.New("set", "length", len(tb.datas)))
 	case "send":
-		evt.Payload().Reply(event.NewPayload(tb.datas))
+		return evt.Payload().Reply(event.NewPayload(tb.datas))
 	case "clear":
 		tb.datas = make(map[string]int)
 	}

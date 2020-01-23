@@ -31,14 +31,13 @@ func TestFSMBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	sigc := asserts.MakeWaitChan()
 	msh := mesh.New()
-	defer msh.Stop()
 
 	processor := func(accessor event.SinkAccessor) (*event.Payload, error) {
 		eventInfos := []string{}
-		accessor.Do(func(index int, evt *event.Event) error {
+		assert.OK(accessor.Do(func(index int, evt *event.Event) error {
 			eventInfos = append(eventInfos, evt.Topic())
 			return nil
-		})
+		}))
 		sigc <- eventInfos
 		return nil, nil
 	}
@@ -46,65 +45,66 @@ func TestFSMBehavior(t *testing.T) {
 	lockA := lockMachine{"a", 0}
 	lockB := lockMachine{"b", 0}
 
-	msh.SpawnCells(
+	assert.OK(msh.SpawnCells(
 		behaviors.NewFSMBehavior("lock-a", behaviors.FSMStatus{"locked", lockA.Locked, nil}),
 		behaviors.NewFSMBehavior("lock-b", behaviors.FSMStatus{"locked", lockB.Locked, nil}),
 		newRestorerBehavior("restorer"),
 		behaviors.NewCollectorBehavior("collector-a", 10, processor),
 		behaviors.NewCollectorBehavior("collector-b", 10, processor),
-	)
-	msh.Subscribe("lock-a", "restorer", "collector-a")
-	msh.Subscribe("lock-b", "restorer", "collector-b")
+	))
+	assert.OK(msh.Subscribe("lock-a", "restorer", "collector-a"))
+	assert.OK(msh.Subscribe("lock-b", "restorer", "collector-b"))
 
 	// 1st run: emit not enough and press button.
-	msh.Emit("lock-a", event.New("coin", "cents", 20))
-	msh.Emit("lock-a", event.New("coin", "cents", 20))
-	msh.Emit("lock-a", event.New("coin", "cents", 20))
-	msh.Emit("lock-a", event.New("info"))
-	msh.Emit("lock-a", event.New("press-button"))
-	msh.Emit("lock-a", event.New("check-cents"))
-	msh.Emit("restorer", event.New("grab"))
+	assert.OK(msh.Emit("lock-a", event.New("coin", "cents", 20)))
+	assert.OK(msh.Emit("lock-a", event.New("coin", "cents", 20)))
+	assert.OK(msh.Emit("lock-a", event.New("coin", "cents", 20)))
+	assert.OK(msh.Emit("lock-a", event.New("info")))
+	assert.OK(msh.Emit("lock-a", event.New("press-button")))
+	assert.OK(msh.Emit("lock-a", event.New("check-cents")))
+	assert.OK(msh.Emit("restorer", event.New("grab")))
 
 	time.Sleep(100 * time.Millisecond)
 
-	msh.Emit("collector-a", event.New(event.TopicProcess))
-	msh.Emit("collector-a", event.New(event.TopicReset))
+	assert.OK(msh.Emit("collector-a", event.New(event.TopicProcess)))
+	assert.OK(msh.Emit("collector-a", event.New(event.TopicReset)))
 
 	assert.Wait(sigc, []string{"status", "coins-dropped", "cents-checked"}, time.Second)
 
 	// 2nd run: unlock the lock and lock it again.
-	msh.Emit("lock-a", event.New("coin", "cents", 50))
-	msh.Emit("lock-a", event.New("coin", "cents", 20))
-	msh.Emit("lock-a", event.New("coin", "cents", 50))
-	msh.Emit("lock-a", event.New("info"))
-	msh.Emit("lock-a", event.New("press-button"))
+	assert.OK(msh.Emit("lock-a", event.New("coin", "cents", 50)))
+	assert.OK(msh.Emit("lock-a", event.New("coin", "cents", 20)))
+	assert.OK(msh.Emit("lock-a", event.New("coin", "cents", 50)))
+	assert.OK(msh.Emit("lock-a", event.New("info")))
+	assert.OK(msh.Emit("lock-a", event.New("press-button")))
 
 	time.Sleep(100 * time.Millisecond)
 
-	msh.Emit("collector-a", event.New(event.TopicProcess))
-	msh.Emit("collector-a", event.New(event.TopicReset))
+	assert.OK(msh.Emit("collector-a", event.New(event.TopicProcess)))
+	assert.OK(msh.Emit("collector-a", event.New(event.TopicReset)))
 
 	assert.Wait(sigc, []string{"unlocked", "status", "coins-dropped"}, time.Second)
 
 	// 3rd run: put a plastic chip in the lock.
-	msh.Emit("lock-a", event.New("plastic-chip"))
+	assert.OK(msh.Emit("lock-a", event.New("plastic-chip")))
 
 	time.Sleep(100 * time.Millisecond)
 
-	msh.Emit("collector-a", event.New(event.TopicProcess))
-	msh.Emit("collector-a", event.New(event.TopicReset))
+	assert.OK(msh.Emit("collector-a", event.New(event.TopicProcess)))
+	assert.OK(msh.Emit("collector-a", event.New(event.TopicReset)))
 
 	assert.Wait(sigc, []string{"dunno"}, time.Second)
 
 	// 4th run: try a bad action.
-	msh.Emit("lock-b", event.New("screwdriver"))
+	assert.OK(msh.Emit("lock-b", event.New("screwdriver")))
 
 	time.Sleep(100 * time.Millisecond)
 
-	msh.Emit("collector-b", event.New(event.TopicProcess))
-	msh.Emit("collector-b", event.New(event.TopicReset))
+	assert.OK(msh.Emit("collector-b", event.New(event.TopicProcess)))
+	assert.OK(msh.Emit("collector-b", event.New(event.TopicReset)))
 
 	assert.Wait(sigc, []string{"error"}, time.Second)
+	assert.OK(msh.Stop())
 }
 
 //--------------------
@@ -127,13 +127,13 @@ type lockMachine struct {
 func (m *lockMachine) Locked(emitter mesh.Emitter, evt *event.Event) behaviors.FSMStatus {
 	switch evt.Topic() {
 	case "check-cents":
-		emitter.Broadcast(event.New(
+		_ = emitter.Broadcast(event.New(
 			"cents-checked",
 			"id", m.id,
 			"cents", m.cents,
 		))
 	case "info":
-		emitter.Broadcast(event.New(
+		_ = emitter.Broadcast(event.New(
 			"status",
 			"id", m.id,
 			"status", "locked",
@@ -147,7 +147,7 @@ func (m *lockMachine) Locked(emitter mesh.Emitter, evt *event.Event) behaviors.F
 		m.cents += cents
 		if m.cents > 100 {
 			m.cents -= 100
-			emitter.Broadcast(event.New(
+			_ = emitter.Broadcast(event.New(
 				"unlocked",
 				"id", m.id,
 				"status", "unlocked",
@@ -156,7 +156,7 @@ func (m *lockMachine) Locked(emitter mesh.Emitter, evt *event.Event) behaviors.F
 		}
 	case "press-button":
 		if m.cents > 0 {
-			emitter.Broadcast(event.New(
+			_ = emitter.Broadcast(event.New(
 				"coins-dropped",
 				"id", m.id,
 				"cents", m.cents,
@@ -164,13 +164,13 @@ func (m *lockMachine) Locked(emitter mesh.Emitter, evt *event.Event) behaviors.F
 			m.cents = 0
 		}
 	case "screwdriver":
-		emitter.Broadcast(event.New(
+		_ = emitter.Broadcast(event.New(
 			"error",
 			"id", m.id,
 		))
 		return behaviors.FSMStatus{evt.Topic(), nil, fmt.Errorf("don't try to break me")}
 	default:
-		emitter.Broadcast(event.New(
+		_ = emitter.Broadcast(event.New(
 			"dunno",
 			"id", m.id,
 		))
@@ -182,13 +182,13 @@ func (m *lockMachine) Locked(emitter mesh.Emitter, evt *event.Event) behaviors.F
 func (m *lockMachine) Unlocked(emitter mesh.Emitter, evt *event.Event) behaviors.FSMStatus {
 	switch evt.Topic() {
 	case "check-cents":
-		emitter.Broadcast(event.New(
+		_ = emitter.Broadcast(event.New(
 			"cents-checked",
 			"id", m.id,
 			"cents", m.cents,
 		))
 	case "info":
-		emitter.Broadcast(event.New(
+		_ = emitter.Broadcast(event.New(
 			"status",
 			"id", m.id,
 			"status", "unlocked",
@@ -196,14 +196,14 @@ func (m *lockMachine) Unlocked(emitter mesh.Emitter, evt *event.Event) behaviors
 		))
 	case "coin":
 		cents := payloadCents(evt)
-		emitter.Broadcast(event.New(
+		_ = emitter.Broadcast(event.New(
 			"coins-returned",
 			"id", m.id,
 			"cents", cents,
 		))
 	case "press-button":
 		if m.cents > 0 {
-			emitter.Broadcast(event.New(
+			_ = emitter.Broadcast(event.New(
 				"coins-dropped",
 				"id", m.id,
 				"cents", m.cents,
@@ -212,7 +212,7 @@ func (m *lockMachine) Unlocked(emitter mesh.Emitter, evt *event.Event) behaviors
 		}
 		return behaviors.FSMStatus{"locked", m.Locked, nil}
 	default:
-		emitter.Broadcast(event.New(
+		_ = emitter.Broadcast(event.New(
 			"dunno",
 			"id", m.id,
 		))
@@ -250,7 +250,7 @@ func (b *restorerBehavior) Terminate() error {
 func (b *restorerBehavior) Process(evt *event.Event) error {
 	switch evt.Topic() {
 	case "grab-coins":
-		b.emitter.Broadcast(event.New("cents", "cents", b.cents))
+		_ = b.emitter.Broadcast(event.New("cents", "cents", b.cents))
 		b.cents = 0
 	case "drop-coins":
 		b.cents += payloadCents(evt)

@@ -194,9 +194,9 @@ func TestRecoveryError(t *testing.T) {
 	assert.ErrorMatch(err, "ouch")
 	<-done
 	assert.OK(recovered)
-	err = act.DoSync(func() {
+	assert.OK(act.DoSync(func() {
 		counter++
-	})
+	}))
 	assert.ErrorMatch(act.Stop(), "ouch")
 }
 
