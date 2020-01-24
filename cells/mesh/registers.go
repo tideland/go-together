@@ -74,19 +74,6 @@ func (cr cellRegistry) remove(id string) error {
 	return nil
 }
 
-// cells retirieves the identified cells.
-func (cr cellRegistry) cells(ids []string) ([]*cell, error) {
-	var cells []*cell
-	for _, id := range ids {
-		entry, ok := cr[id]
-		if !ok {
-			return nil, failure.New("cannot find cell %q", id)
-		}
-		cells = append(cells, entry.cell)
-	}
-	return cells, nil
-}
-
 // subscribe subscribes the wanted subscribers to a cell and also tells
 // those where they subscribed to.
 func (cr cellRegistry) subscribe(id string, subscriberIDs []string) error {

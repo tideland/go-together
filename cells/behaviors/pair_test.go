@@ -32,7 +32,6 @@ func TestPairBehavior(t *testing.T) {
 	sigc := asserts.MakeWaitChan()
 	generator := generators.New(generators.FixedRand())
 	msh := mesh.New()
-	defer msh.Stop()
 
 	matchCount := make(map[string]int)
 	matchDone := false
@@ -57,16 +56,16 @@ func TestPairBehavior(t *testing.T) {
 	}
 	timespan := 10 * time.Millisecond
 
-	msh.SpawnCells(
+	assert.OK(msh.SpawnCells(
 		behaviors.NewPairBehavior("pairer", matches, timespan),
 		behaviors.NewSimpleProcessorBehavior("processor", processor),
-	)
-	msh.Subscribe("pairer", "processor")
+	))
+	assert.OK(msh.Subscribe("pairer", "processor"))
 
 	go func() {
 		for !matchDone {
 			name := generator.OneStringOf(names...)
-			msh.Emit("pairer", event.New("visitor", "name", name))
+			assert.OK(msh.Emit("pairer", event.New("visitor", "name", name)))
 		}
 	}()
 
@@ -74,8 +73,9 @@ func TestPairBehavior(t *testing.T) {
 
 	matchDone = false
 
-	assert.True(matchCount[behaviors.TopicPair] > 0)
-	assert.True(matchCount[behaviors.TopicPairTimeout] > 0)
+	assert.OK(matchCount[behaviors.TopicPair] > 0)
+	assert.OK(matchCount[behaviors.TopicPairTimeout] > 0)
+	assert.OK(msh.Stop())
 }
 
 // EOF

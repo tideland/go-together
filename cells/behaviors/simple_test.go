@@ -29,7 +29,6 @@ import (
 func TestSimpleProcessorBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	msh := mesh.New()
-	defer msh.Stop()
 
 	topics := []string{}
 	var wg sync.WaitGroup
@@ -39,17 +38,18 @@ func TestSimpleProcessorBehavior(t *testing.T) {
 		return nil
 	}
 
-	msh.SpawnCells(
+	assert.OK(msh.SpawnCells(
 		behaviors.NewSimpleProcessorBehavior("simple", spf),
-	)
+	))
 
 	wg.Add(3)
-	msh.Emit("simple", event.New("foo"))
-	msh.Emit("simple", event.New("bar"))
-	msh.Emit("simple", event.New("baz"))
+	assert.OK(msh.Emit("simple", event.New("foo")))
+	assert.OK(msh.Emit("simple", event.New("bar")))
+	assert.OK(msh.Emit("simple", event.New("baz")))
 
 	wg.Wait()
 	assert.Length(topics, 3)
+	assert.OK(msh.Stop())
 }
 
 // EOF

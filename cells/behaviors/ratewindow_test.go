@@ -33,7 +33,6 @@ func TestRateWindowBehavior(t *testing.T) {
 	sigc := asserts.MakeWaitChan()
 	generator := generators.New(generators.FixedRand())
 	msh := mesh.New()
-	defer msh.Stop()
 
 	topics := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "bang"}
 	duration := 50 * time.Millisecond
@@ -49,21 +48,21 @@ func TestRateWindowBehavior(t *testing.T) {
 	}
 	oncer := func(emitter mesh.Emitter, evt *event.Event) error {
 		difference := evt.Payload().At("difference").AsDuration(0)
-		assert.True(difference < duration)
+		assert.OK(difference < duration)
 		assert.Equal(evt.Topic(), behaviors.TopicRateWindow)
 		sigc <- difference
 		return nil
 	}
 
-	msh.SpawnCells(
+	assert.OK(msh.SpawnCells(
 		behaviors.NewRateWindowBehavior("windower", matcher, 5, duration, processor),
 		behaviors.NewOnceBehavior("oncer", oncer),
-	)
-	msh.Subscribe("windower", "oncer")
+	))
+	assert.OK(msh.Subscribe("windower", "oncer"))
 
 	for i := 0; i < 250; i++ {
 		topic := generator.OneStringOf(topics...)
-		msh.Emit("windower", event.New(topic))
+		assert.OK(msh.Emit("windower", event.New(topic)))
 		time.Sleep(time.Millisecond)
 	}
 
@@ -74,6 +73,7 @@ func TestRateWindowBehavior(t *testing.T) {
 		}
 		return nil
 	}, 5*time.Second)
+	assert.OK(msh.Stop())
 }
 
 // EOF

@@ -32,7 +32,6 @@ func TestRateBehavior(t *testing.T) {
 	sigc := asserts.MakeWaitChan()
 	generator := generators.New(generators.FixedRand())
 	msh := mesh.New()
-	defer msh.Stop()
 
 	matcher := func(evt *event.Event) (bool, error) {
 		return evt.Topic() == "now", nil
@@ -47,20 +46,21 @@ func TestRateBehavior(t *testing.T) {
 	}
 	topics := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "now"}
 
-	msh.SpawnCells(
+	assert.OK(msh.SpawnCells(
 		behaviors.NewRateBehavior("rater", matcher, 100),
 		behaviors.NewCollectorBehavior("collector", 10000, processor),
-	)
-	msh.Subscribe("rater", "collector")
+	))
+	assert.OK(msh.Subscribe("rater", "collector"))
 
 	for i := 0; i < 1000; i++ {
 		topic := generator.OneStringOf(topics...)
-		msh.Emit("rater", event.New(topic))
+		assert.OK(msh.Emit("rater", event.New(topic)))
 		generator.SleepOneOf(0, time.Millisecond, 2*time.Millisecond)
 	}
 
-	msh.Emit("collector", event.New(event.TopicProcess))
+	assert.OK(msh.Emit("collector", event.New(event.TopicProcess)))
 	assert.Wait(sigc, true, 10*time.Second)
+	assert.OK(msh.Stop())
 }
 
 // EOF

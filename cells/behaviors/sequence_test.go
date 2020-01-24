@@ -32,7 +32,6 @@ func TestSequenceBehavior(t *testing.T) {
 	sigc := asserts.MakeWaitChan()
 	generator := generators.New(generators.FixedRand())
 	msh := mesh.New()
-	defer msh.Stop()
 
 	sequence := []string{"a", "b", "now"}
 	sequencer := func(accessor event.SinkAccessor) event.CriterionMatch {
@@ -52,7 +51,7 @@ func TestSequenceBehavior(t *testing.T) {
 	}
 	analyzer := func(accessor event.SinkAccessor) (*event.Payload, error) {
 		first, ok := accessor.PeekFirst()
-		assert.True(ok)
+		assert.OK(ok)
 		return first.Payload(), nil
 	}
 	processor := func(accessor event.SinkAccessor) (*event.Payload, error) {
@@ -68,20 +67,21 @@ func TestSequenceBehavior(t *testing.T) {
 	}
 	topics := []string{"a", "b", "c", "d", "now"}
 
-	msh.SpawnCells(
+	assert.OK(msh.SpawnCells(
 		behaviors.NewSequenceBehavior("sequencer", sequencer, analyzer),
 		behaviors.NewCollectorBehavior("collector", 100, processor),
-	)
-	msh.Subscribe("sequencer", "collector")
+	))
+	assert.OK(msh.Subscribe("sequencer", "collector"))
 
 	for i := 0; i < 1000; i++ {
 		topic := generator.OneStringOf(topics...)
-		msh.Emit("sequencer", event.New(topic, "index", i))
+		assert.OK(msh.Emit("sequencer", event.New(topic, "index", i)))
 		generator.SleepOneOf(0, 1*time.Millisecond, 2*time.Millisecond)
 	}
 
-	msh.Emit("collector", event.New(event.TopicProcess))
+	assert.OK(msh.Emit("collector", event.New(event.TopicProcess)))
 	assert.Wait(sigc, []int{155, 269, 287, 298, 523, 888}, time.Minute)
+	assert.OK(msh.Stop())
 }
 
 // EOF

@@ -32,7 +32,6 @@ func TestTopicPayloadsBehavior(t *testing.T) {
 	generator := generators.New(generators.FixedRand())
 	sigc := asserts.MakeWaitChan()
 	msh := mesh.New()
-	defer msh.Stop()
 
 	tpProcessor := func(topic string, pls []*event.Payload) (*event.Payload, error) {
 		total := 0
@@ -52,11 +51,11 @@ func TestTopicPayloadsBehavior(t *testing.T) {
 		return nil, err
 	}
 
-	msh.SpawnCells(
+	assert.OK(msh.SpawnCells(
 		behaviors.NewTopicPayloadsBehavior("topic-payloads", 5, tpProcessor),
 		behaviors.NewCollectorBehavior("collector", 10, cProcessor),
-	)
-	msh.Subscribe("topic-payloads", "collector")
+	))
+	assert.OK(msh.Subscribe("topic-payloads", "collector"))
 
 	topics := []string{"alpha", "beta", "gamma"}
 	values := []int{1, 2, 3, 4, 5}
@@ -64,11 +63,12 @@ func TestTopicPayloadsBehavior(t *testing.T) {
 	for i := 0; i < 50; i++ {
 		topic := generator.OneStringOf(topics...)
 		value := generator.OneIntOf(values...)
-		msh.Emit("topic-payloads", event.New(topic, "value", value))
+		assert.OK(msh.Emit("topic-payloads", event.New(topic, "value", value)))
 	}
 
-	msh.Emit("collector", event.New(event.TopicProcess))
+	assert.OK(msh.Emit("collector", event.New(event.TopicProcess)))
 	assert.Wait(sigc, true, 5*time.Second)
+	assert.OK(msh.Stop())
 }
 
 // EOF
