@@ -149,19 +149,17 @@ func (c *cell) unsubscribe(subscribers []*cell) error {
 
 // process lets the cell behavior process the event asynchronously.
 func (c *cell) process(evt *event.Event) error {
-	var err error
 	if aerr := c.act.DoAsync(func() {
 		if evt.Done() {
 			return
 		}
-		err = c.behavior.Process(evt)
-		if err != nil {
+		if err := c.behavior.Process(evt); err != nil {
 			err = c.behavior.Recover(err)
 		}
 	}); aerr != nil {
 		return failure.Annotate(aerr, "processing cell %q", c.behavior.ID())
 	}
-	return err
+	return nil
 }
 
 // Finalize implements the loop.Finalizer to perform termination

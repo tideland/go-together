@@ -150,16 +150,22 @@ func (act *Actor) Err() error {
 	return act.err.Get()
 }
 
-// Stop terminates the Actor backend.
-func (act *Actor) Stop() error {
+// Kill terminates the Actor backend with a given external error.
+func (act *Actor) Kill(err error) error {
 	if !act.err.IsNil() {
 		return act.err.Get()
 	}
+	act.err.Set(err)
 	act.cancel()
 	if err := act.signal.Wait(fuse.Stopped, DefaultTimeout); err != nil {
 		return err
 	}
 	return act.err.Get()
+}
+
+// Stop terminates the Actor backend.
+func (act *Actor) Stop() error {
+	return act.Kill(nil)
 }
 
 // backend runs the goroutine of the Actor.

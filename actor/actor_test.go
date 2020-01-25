@@ -26,7 +26,7 @@ import (
 //--------------------
 
 // TestPureOK is simply starting and stopping an Actor.
-func TestPureGoOK(t *testing.T) {
+func TestPureOK(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	done := false
 	act, err := actor.Go(actor.WithFinalizer(func(err error) error {
@@ -38,6 +38,22 @@ func TestPureGoOK(t *testing.T) {
 
 	assert.OK(act.Stop())
 	assert.OK(act.Err())
+	assert.OK(done)
+}
+
+// TestPureKill is simply starting and killing an Actor.
+func TestPureKill(t *testing.T) {
+	assert := asserts.NewTesting(t, asserts.FailStop)
+	done := false
+	act, err := actor.Go(actor.WithFinalizer(func(err error) error {
+		done = true
+		return err
+	}))
+	assert.OK(err)
+	assert.NotNil(act)
+
+	assert.ErrorMatch(act.Kill(errors.New("killed")), "killed")
+	assert.ErrorMatch(act.Err(), "killed")
 	assert.OK(done)
 }
 
@@ -194,9 +210,9 @@ func TestRecoveryError(t *testing.T) {
 	assert.ErrorMatch(err, "ouch")
 	<-done
 	assert.OK(recovered)
-	assert.OK(act.DoSync(func() {
+	assert.ErrorMatch(act.DoSync(func() {
 		counter++
-	}))
+	}), "ouch")
 	assert.ErrorMatch(act.Stop(), "ouch")
 }
 
