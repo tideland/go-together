@@ -109,16 +109,22 @@ func (l *Loop) Err() error {
 	return l.err.Get()
 }
 
-// Stop terminates the Loop backend.
-func (l *Loop) Stop() error {
+// Kill terminates the Loop backend with a given external error.
+func (l *Loop) Kill(err error) error {
 	if !l.err.IsNil() {
 		return l.err.Get()
 	}
+	l.err.Set(err)
 	l.cancel()
 	if err := l.signal.Wait(fuse.Stopped, timeout); err != nil {
 		return err
 	}
 	return l.err.Get()
+}
+
+// Stop terminates the Loop backend.
+func (l *Loop) Stop() error {
+	return l.Kill(nil)
 }
 
 // backend runs the loop worker as goroutine as long as
