@@ -14,6 +14,7 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 import (
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
+	"tideland.dev/go/together/fuse"
 )
 
 //--------------------
@@ -57,13 +58,12 @@ func (b *onceBehavior) Terminate() error {
 }
 
 // Process calls the one-timer, but only for the first received event.
-func (b *onceBehavior) Process(evt *event.Event) error {
+func (b *onceBehavior) Process(evt *event.Event) {
 	if b.oneTimer != nil {
 		err := b.oneTimer(b.emitter, evt)
+		fuse.Trigger(err)
 		b.oneTimer = nil
-		return err
 	}
-	return nil
 }
 
 // Recover from an error.

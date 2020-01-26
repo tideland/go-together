@@ -14,6 +14,7 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 import (
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
+	"tideland.dev/go/together/fuse"
 )
 
 //--------------------
@@ -63,7 +64,7 @@ func (b *topicPayloadsBehavior) Terminate() error {
 
 // Process calls the processor function for the collected payloads
 // by the events topic.
-func (b *topicPayloadsBehavior) Process(evt *event.Event) error {
+func (b *topicPayloadsBehavior) Process(evt *event.Event) {
 	topic := evt.Topic()
 	pls := b.collected[topic]
 	pls = append(pls, evt.Payload())
@@ -72,10 +73,8 @@ func (b *topicPayloadsBehavior) Process(evt *event.Event) error {
 	}
 	b.collected[topic] = pls
 	pl, err := b.process(topic, b.collected[topic])
-	if err != nil {
-		return err
-	}
-	return b.emitter.Broadcast(event.New(topic, pl))
+	fuse.Trigger(err)
+	fuse.Trigger(b.emitter.Broadcast(event.New(topic, pl)))
 }
 
 // Recover from an error.

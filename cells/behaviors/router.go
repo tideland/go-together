@@ -14,7 +14,7 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 import (
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
-	"tideland.dev/go/trace/failure"
+	"tideland.dev/go/together/fuse"
 )
 
 //--------------------
@@ -58,13 +58,11 @@ func (b *routerBehavior) Terminate() error {
 }
 
 // Process emits the event to those ids returned by the router function.
-func (b *routerBehavior) Process(evt *event.Event) error {
+func (b *routerBehavior) Process(evt *event.Event) {
 	ids := b.routeTo(evt)
-	var errs []error
 	for _, id := range ids {
-		errs = append(errs, b.emitter.Emit(id, evt))
+		fuse.Trigger(b.emitter.Emit(id, evt))
 	}
-	return failure.Collect(errs...)
 }
 
 // Recover from an error.

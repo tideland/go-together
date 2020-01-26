@@ -52,9 +52,8 @@ func (b *loggerBehavior) Terminate() error {
 }
 
 // Process logs the event at info level.
-func (b *loggerBehavior) Process(evt *event.Event) error {
+func (b *loggerBehavior) Process(evt *event.Event) {
 	logger.Infof("(%s) logging event %v", b.id, evt)
-	return nil
 }
 
 // Recover from an error. Can't even log, it's a logging problem.

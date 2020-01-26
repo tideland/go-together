@@ -14,6 +14,7 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 import (
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
+	"tideland.dev/go/together/fuse"
 )
 
 //--------------------
@@ -80,24 +81,21 @@ func (b *filterBehavior) Terminate() error {
 
 // Process emits the event when the filter func returns true and the
 // mode is select or it returns false and the mode is exclude.
-func (b *filterBehavior) Process(evt *event.Event) error {
+func (b *filterBehavior) Process(evt *event.Event) {
 	ok, err := b.matches(evt)
-	if err != nil {
-		return err
-	}
+	fuse.Trigger(err)
 	switch b.mode {
 	case selectFilter:
 		// Select those who match.
 		if ok {
-			return b.emitter.Broadcast(evt)
+			fuse.Trigger(b.emitter.Broadcast(evt))
 		}
 	case excludeFilter:
 		// Select those who don't match.
 		if !ok {
-			return b.emitter.Broadcast(evt)
+			fuse.Trigger(b.emitter.Broadcast(evt))
 		}
 	}
-	return nil
 }
 
 // Recover from an error.

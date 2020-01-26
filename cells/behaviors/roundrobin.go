@@ -16,6 +16,7 @@ import (
 
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
+	"tideland.dev/go/together/fuse"
 )
 
 //--------------------
@@ -56,21 +57,18 @@ func (b *roundRobinBehavior) Terminate() error {
 }
 
 // Process emits the event round robin to the subscribers.
-func (b *roundRobinBehavior) Process(evt *event.Event) error {
+func (b *roundRobinBehavior) Process(evt *event.Event) {
 	subscribers := b.emitter.Subscribers()
 	ls := len(subscribers)
 	if ls == 0 {
-		return nil
+		return
 	}
 	if b.current >= ls {
 		b.current = 0
 	}
 	sort.Strings(subscribers)
-	if err := b.emitter.Emit(subscribers[b.current], evt); err != nil {
-		return err
-	}
+	fuse.Trigger(b.emitter.Emit(subscribers[b.current], evt))
 	b.current++
-	return nil
 }
 
 // Recover from an error.

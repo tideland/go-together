@@ -16,6 +16,7 @@ import (
 
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
+	"tideland.dev/go/together/fuse"
 )
 
 //--------------------
@@ -88,19 +89,16 @@ func (b *evaluatorBehavior) Terminate() error {
 }
 
 // Process evaluates the event.
-func (b *evaluatorBehavior) Process(evt *event.Event) error {
+func (b *evaluatorBehavior) Process(evt *event.Event) {
 	switch evt.Topic() {
 	case event.TopicReset:
 		b.ratings = nil
 		b.sortedRatings = nil
 		b.evaluation = evaluation{}
-		return nil
 	default:
 		// Evaluate event and collect rating.
 		rating, err := b.evaluate(evt)
-		if err != nil {
-			return err
-		}
+		fuse.Trigger(err)
 		b.ratings = append(b.ratings, rating)
 		if b.maxRatings > 0 && len(b.ratings) > b.maxRatings {
 			b.ratings = b.ratings[1:]
@@ -111,14 +109,14 @@ func (b *evaluatorBehavior) Process(evt *event.Event) error {
 		}
 		// Evaluate ratings.
 		b.evaluateRatings()
-		return b.emitter.Broadcast(event.New(
+		fuse.Trigger(b.emitter.Broadcast(event.New(
 			TopicEvaluation,
 			"count", b.evaluation.count,
 			"min-rating", b.evaluation.minRating,
 			"max-rating", b.evaluation.maxRating,
 			"avg-rating", b.evaluation.avgRating,
 			"med-rating", b.evaluation.medRating,
-		))
+		)))
 	}
 }
 

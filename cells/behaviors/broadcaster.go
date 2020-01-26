@@ -14,6 +14,7 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 import (
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
+	"tideland.dev/go/together/fuse"
 )
 
 //--------------------
@@ -52,8 +53,8 @@ func (b *broadcasterBehavior) Terminate() error {
 }
 
 // Process emits the event to all subscribers.
-func (b *broadcasterBehavior) Process(evt *event.Event) error {
-	return b.emitter.Broadcast(evt)
+func (b *broadcasterBehavior) Process(evt *event.Event) {
+	fuse.Trigger(b.emitter.Broadcast(evt))
 }
 
 // Recover from an error.

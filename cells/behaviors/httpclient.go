@@ -17,6 +17,7 @@ import (
 	"tideland.dev/go/net/httpx"
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
+	"tideland.dev/go/together/fuse"
 )
 
 //--------------------
@@ -54,12 +55,11 @@ func (b *httpClientBehavior) Terminate() error {
 }
 
 // Process performs the HTTP request.
-func (b *httpClientBehavior) Process(evt *event.Event) error {
+func (b *httpClientBehavior) Process(evt *event.Event) {
 	switch evt.Topic() {
 	case TopicHTTPGet:
-		return b.processGet(evt)
+		fuse.Trigger(b.processGet(evt))
 	}
-	return nil
 }
 
 // Recover from an error.

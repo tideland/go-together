@@ -14,6 +14,7 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 import (
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
+	"tideland.dev/go/together/fuse"
 )
 
 //--------------------
@@ -62,10 +63,10 @@ func (b *counterBehavior) Terminate() error {
 
 // Process counts the event for the return value of the counter func
 // and emits this value.
-func (b *counterBehavior) Process(evt *event.Event) error {
+func (b *counterBehavior) Process(evt *event.Event) {
 	switch evt.Topic() {
 	case event.TopicStatus:
-		return evt.Payload().Reply(event.NewPayload("counter", b.values))
+		fuse.Trigger(evt.Payload().Reply(event.NewPayload("counter", b.values)))
 	case event.TopicReset:
 		b.values = map[string]int{}
 	default:
@@ -73,9 +74,8 @@ func (b *counterBehavior) Process(evt *event.Event) error {
 		for _, counter := range counters {
 			b.values[counter]++
 		}
-		return b.emitter.Broadcast(event.New(event.TopicCounted, b.values))
+		fuse.Trigger(b.emitter.Broadcast(event.New(event.TopicCounted, b.values)))
 	}
-	return nil
 }
 
 // Recover from an error.

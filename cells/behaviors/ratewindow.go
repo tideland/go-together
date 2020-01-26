@@ -16,6 +16,7 @@ import (
 
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
+	"tideland.dev/go/together/fuse"
 )
 
 //--------------------
@@ -75,21 +76,18 @@ func (b *rateWindowBehavior) Terminate() error {
 }
 
 // Process implements the cells.Behavior interface.
-func (b *rateWindowBehavior) Process(evt *event.Event) error {
+func (b *rateWindowBehavior) Process(evt *event.Event) {
 	switch evt.Topic() {
 	case event.TopicReset:
-		return b.sink.Clear()
+		fuse.Trigger(b.sink.Clear())
 	default:
 		ok, err := b.matches(evt)
-		if err != nil {
-			return err
-		}
+		fuse.Trigger(err)
 		if !ok {
-			return nil
+			return
 		}
-		if _, err = b.sink.Push(evt); err != nil {
-			return err
-		}
+		_, err = b.sink.Push(evt)
+		fuse.Trigger(err)
 		if b.sink.Len() == b.count {
 			// Got enough matches, check duration.
 			first, _ := b.sink.PeekFirst()
@@ -98,18 +96,12 @@ func (b *rateWindowBehavior) Process(evt *event.Event) error {
 			if difference <= b.duration {
 				// We've got a burst!
 				pl, err := b.process(b.sink)
-				if err != nil {
-					return err
-				}
-				if err = b.emitter.Broadcast(event.New(TopicRateWindow, pl)); err != nil {
-					return err
-				}
+				fuse.Trigger(err)
+				fuse.Trigger(b.emitter.Broadcast(event.New(TopicRateWindow, pl)))
 			}
-			if _, err := b.sink.PullFirst(); err != nil {
-				return err
-			}
+			_, err := b.sink.PullFirst()
+			fuse.Trigger(err)
 		}
-		return nil
 	}
 }
 

@@ -14,6 +14,7 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 import (
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
+	"tideland.dev/go/together/fuse"
 )
 
 //--------------------
@@ -56,15 +57,12 @@ func (b *mapperBehavior) Terminate() error {
 }
 
 // Process maps the received event to a new one and emits it.
-func (b *mapperBehavior) Process(evt *event.Event) error {
+func (b *mapperBehavior) Process(evt *event.Event) {
 	mapped, err := b.mapper(evt)
-	if err != nil {
-		return err
-	}
+	fuse.Trigger(err)
 	if mapped != nil {
-		return b.emitter.Broadcast(mapped)
+		fuse.Trigger(b.emitter.Broadcast(mapped))
 	}
-	return nil
 }
 
 // Recover from an error.

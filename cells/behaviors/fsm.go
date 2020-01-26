@@ -14,6 +14,7 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 import (
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
+	"tideland.dev/go/together/fuse"
 )
 
 //--------------------
@@ -80,25 +81,25 @@ func (b *fsmBehavior) Terminate() error {
 
 // Process executes the state function and stores
 // the returned new state.
-func (b *fsmBehavior) Process(evt *event.Event) error {
+func (b *fsmBehavior) Process(evt *event.Event) {
 	// Check if done.
 	if b.status.Done() {
-		return nil
+		return
 	}
 	// Process event and determine next status.
 	switch evt.Topic() {
 	case TopicFSMStatus:
 		// Emit information.
-		return b.emitter.Broadcast(event.New(
+		fuse.Trigger(b.emitter.Broadcast(event.New(
 			event.TopicStatus,
 			"info", b.status.Info,
 			"done", b.status.Done(),
 			"error", b.status.Error,
-		))
+		)))
 	default:
 		// Process event.
 		b.status = b.status.Process(b.emitter, evt)
-		return b.status.Error
+		fuse.Trigger(b.status.Error)
 	}
 }
 

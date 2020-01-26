@@ -14,6 +14,7 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 import (
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
+	"tideland.dev/go/together/fuse"
 )
 
 //--------------------
@@ -62,11 +63,10 @@ func (b *conditionBehavior) Terminate() error {
 }
 
 // Process checks the condition.
-func (b *conditionBehavior) Process(evt *event.Event) error {
+func (b *conditionBehavior) Process(evt *event.Event) {
 	if b.test(evt) {
-		return b.process(b.emitter, evt)
+		fuse.Trigger(b.process(b.emitter, evt))
 	}
-	return nil
 }
 
 // Recover from an error.

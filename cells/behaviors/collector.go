@@ -14,6 +14,7 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 import (
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
+	"tideland.dev/go/together/fuse"
 )
 
 //--------------------
@@ -60,21 +61,18 @@ func (b *collectorBehavior) Terminate() error {
 }
 
 // Process collects, processes, and re-emits events.
-func (b *collectorBehavior) Process(evt *event.Event) error {
+func (b *collectorBehavior) Process(evt *event.Event) {
 	switch evt.Topic() {
 	case event.TopicProcess:
 		pl, err := b.process(b.sink)
-		if err != nil {
-			return err
-		}
-		return b.emitter.Broadcast(event.New(event.TopicResult, pl))
+		fuse.Trigger(err)
+		fuse.Trigger(b.emitter.Broadcast(event.New(event.TopicResult, pl)))
 	case event.TopicReset:
-		return b.sink.Clear()
+		fuse.Trigger(b.sink.Clear())
 	default:
-		if _, err := b.sink.Push(evt); err != nil {
-			return err
-		}
-		return b.emitter.Broadcast(evt)
+		_, err := b.sink.Push(evt)
+		fuse.Trigger(err)
+		fuse.Trigger(b.emitter.Broadcast(evt))
 	}
 }
 

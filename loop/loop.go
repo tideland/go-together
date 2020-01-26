@@ -122,7 +122,7 @@ func (l *Loop) Stop() error {
 }
 
 // backend runs the loop worker as goroutine as long as
-// the status is notifier.Working.
+// the it isn't terminated or recovery returned false.
 func (l *Loop) backend() {
 	defer func() {
 		l.err.Set(l.finalizer(l.err.Get()))

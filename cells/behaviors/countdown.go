@@ -14,6 +14,7 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 import (
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
+	"tideland.dev/go/together/fuse"
 )
 
 //--------------------
@@ -64,33 +65,26 @@ func (b *countdownBehavior) Terminate() error {
 // Process puts the received events into a sink. When reaching t the
 // zeroer will be called with access to the sink. Its returned event
 // will be emitted, the returned t will be set, and the sink cleared.
-func (b *countdownBehavior) Process(evt *event.Event) error {
+func (b *countdownBehavior) Process(evt *event.Event) {
 	switch evt.Topic() {
 	case event.TopicReset:
 		t := evt.Payload().At("t").AsInt(b.t)
 		b.t = t
-		return b.sink.Clear()
+		fuse.Trigger(b.sink.Clear())
 	default:
 		if b.t <= 0 {
-			return nil
+			return
 		}
 		sl, err := b.sink.Push(evt)
-		if err != nil {
-			return err
-		}
+		fuse.Trigger(err)
 		if sl == b.t {
 			// T-0, call the zeroer, set t, and emit event.
 			zevt, t, err := b.zeroer(b.sink)
-			if err != nil {
-				return err
-			}
+			fuse.Trigger(err)
 			b.t = t
-			if err = b.sink.Clear(); err != nil {
-				return err
-			}
-			return b.emitter.Broadcast(zevt)
+			fuse.Trigger(b.sink.Clear())
+			fuse.Trigger(b.emitter.Broadcast(zevt))
 		}
-		return nil
 	}
 }
 

@@ -16,6 +16,7 @@ import (
 
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
+	"tideland.dev/go/together/fuse"
 )
 
 //--------------------
@@ -68,16 +69,14 @@ func (b *rateBehavior) Terminate() error {
 }
 
 // Process calculates the rate of matching events.
-func (b *rateBehavior) Process(evt *event.Event) error {
+func (b *rateBehavior) Process(evt *event.Event) {
 	switch evt.Topic() {
 	case event.TopicReset:
 		b.last = time.Now()
 		b.durations = []time.Duration{}
 	default:
 		ok, err := b.matches(evt)
-		if err != nil {
-			return err
-		}
+		fuse.Trigger(err)
 		if ok {
 			current := evt.Timestamp()
 			duration := current.Sub(b.last)
@@ -99,17 +98,16 @@ func (b *rateBehavior) Process(evt *event.Event) error {
 				}
 			}
 			avg := total / time.Duration(len(b.durations))
-			return b.emitter.Broadcast(event.New(
+			fuse.Trigger(b.emitter.Broadcast(event.New(
 				TopicRate,
 				"time", current,
 				"duration", duration,
 				"high", high,
 				"low", low,
 				"average", avg,
-			))
+			)))
 		}
 	}
-	return nil
 }
 
 // Recover implements the cells.Behavior interface.

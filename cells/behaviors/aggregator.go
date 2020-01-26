@@ -14,6 +14,7 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 import (
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
+	"tideland.dev/go/together/fuse"
 )
 
 //--------------------
@@ -60,20 +61,17 @@ func (b *aggregatorBehavior) Terminate() error {
 }
 
 // Process aggregates the event.
-func (b *aggregatorBehavior) Process(evt *event.Event) error {
+func (b *aggregatorBehavior) Process(evt *event.Event) {
 	switch evt.Topic() {
 	case event.TopicStatus:
-		return evt.Payload().Reply(b.payload)
+		fuse.Trigger(evt.Payload().Reply(b.payload))
 	case event.TopicReset:
 		b.payload = nil
-		return nil
 	default:
 		pl, err := b.aggregate(b.payload, evt)
-		if err != nil {
-			return err
-		}
+		fuse.Trigger(err)
 		b.payload = pl
-		return b.emitter.Broadcast(event.New(TopicAggregated, pl))
+		fuse.Trigger(b.emitter.Broadcast(event.New(TopicAggregated, pl)))
 	}
 }
 

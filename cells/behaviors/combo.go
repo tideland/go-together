@@ -14,6 +14,7 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 import (
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
+	"tideland.dev/go/together/fuse"
 )
 
 //--------------------
@@ -65,36 +66,34 @@ func (b *comboBehavior) Terminate() error {
 }
 
 // Process matches events for a combination of criteria.
-func (b *comboBehavior) Process(evt *event.Event) error {
+func (b *comboBehavior) Process(evt *event.Event) {
 	switch evt.Topic() {
 	case event.TopicReset:
-		return b.sink.Clear()
+		fuse.Trigger(b.sink.Clear())
 	default:
-		if _, err := b.sink.Push(evt); err != nil {
-			return err
-		}
+		_, err := b.sink.Push(evt)
+		fuse.Trigger(err)
 		matches, pl := b.matches(b.sink)
 		switch matches {
 		case event.CriterionDone:
 			// All done, emit and start over.
-			if err := b.emitter.Broadcast(event.New(TopicComboComplete, pl)); err != nil {
-				return err
-			}
+			fuse.Trigger(b.emitter.Broadcast(event.New(TopicComboComplete, pl)))
 			b.sink = event.NewSink(0)
 		case event.CriterionKeep:
 			// So far ok.
 		case event.CriterionDropFirst:
 			// First event doesn't match.
-			_, _ = b.sink.PullFirst()
+			_, err := b.sink.PullFirst()
+			fuse.Trigger(err)
 		case event.CriterionDropLast:
 			// Last event doesn't match.
-			_, _ = b.sink.PullLast()
+			_, err := b.sink.PullLast()
+			fuse.Trigger(err)
 		default:
 			// Have to start from beginning.
-			_ = b.sink.Clear()
+			fuse.Trigger(b.sink.Clear())
 		}
 	}
-	return nil
 }
 
 // Recover from an error.

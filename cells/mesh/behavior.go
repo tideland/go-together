@@ -58,7 +58,7 @@ type Behavior interface {
 	Terminate() error
 
 	// Process is called to process the given event.
-	Process(evt *event.Event) error
+	Process(evt *event.Event)
 
 	// Recover is called in case of an error or panic during the processing
 	// of an event. Here the behavior can check if it can recover and establish

@@ -14,6 +14,7 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 import (
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
+	"tideland.dev/go/together/fuse"
 )
 
 //--------------------
@@ -64,30 +65,27 @@ func (b *sequenceBehavior) Terminate() error {
 }
 
 // Process ...
-func (b *sequenceBehavior) Process(evt *event.Event) error {
+func (b *sequenceBehavior) Process(evt *event.Event) {
 	switch evt.Topic() {
 	case event.TopicReset:
-		return b.sink.Clear()
+		fuse.Trigger(b.sink.Clear())
 	default:
-		if _, err := b.sink.Push(evt); err != nil {
-			return err
-		}
+		_, err := b.sink.Push(evt)
+		fuse.Trigger(err)
 		matches := b.matches(b.sink)
 		switch matches {
 		case event.CriterionDone:
 			// All done, process and start over.
 			pl, err := b.process(b.sink)
-			if err != nil {
-				return err
-			}
+			fuse.Trigger(err)
 			b.sink = event.NewSink(0)
-			return b.emitter.Broadcast(event.New(TopicSequence, pl))
+			fuse.Trigger(b.emitter.Broadcast(event.New(TopicSequence, pl)))
 		case event.CriterionKeep:
 			// So far ok.
-			return nil
+			return
 		default:
 			// Have to start from beginning.
-			return b.sink.Clear()
+			fuse.Trigger(b.sink.Clear())
 		}
 	}
 }

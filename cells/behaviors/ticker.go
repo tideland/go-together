@@ -16,6 +16,7 @@ import (
 
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
+	"tideland.dev/go/together/fuse"
 	"tideland.dev/go/together/loop"
 	"tideland.dev/go/trace/failure"
 )
@@ -63,11 +64,10 @@ func (b *tickerBehavior) Terminate() error {
 }
 
 // Process emits a ticker event each time the defined duration elapsed.
-func (b *tickerBehavior) Process(evt *event.Event) error {
+func (b *tickerBehavior) Process(evt *event.Event) {
 	if evt.Topic() == TopicTick {
-		return b.emitter.Broadcast(event.New(TopicTick, "id", b.id))
+		fuse.Trigger(b.emitter.Broadcast(event.New(TopicTick, "id", b.id)))
 	}
-	return nil
 }
 
 // Recover from an error. Counter will be set back to the initial counter.

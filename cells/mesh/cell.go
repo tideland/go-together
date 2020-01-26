@@ -14,6 +14,7 @@ package mesh // import "tideland.dev/go/together/cells/mesh"
 import (
 	"tideland.dev/go/together/actor"
 	"tideland.dev/go/together/cells/event"
+	"tideland.dev/go/together/fuse"
 	"tideland.dev/go/trace/failure"
 )
 
@@ -99,9 +100,7 @@ func (c *cell) Broadcast(evt *event.Event) error {
 // Self is part of Emitter interface and emits the given event
 // back to the cell itself.
 func (c *cell) Self(evt *event.Event) {
-	go func() {
-		_ = c.process(evt)
-	}()
+	fuse.Trigger(c.msh.Emit(c.behavior.ID(), evt))
 }
 
 // SetQueueCap is part of the Configurable interface and allows
@@ -153,9 +152,7 @@ func (c *cell) process(evt *event.Event) error {
 		if evt.Done() {
 			return
 		}
-		if err := c.behavior.Process(evt); err != nil {
-			err = c.behavior.Recover(err)
-		}
+		c.behavior.Process(evt)
 	}); aerr != nil {
 		return failure.Annotate(aerr, "processing cell %q", c.behavior.ID())
 	}
@@ -201,9 +198,7 @@ func (db *terminatedBehavior) Terminate() error {
 	return nil
 }
 
-func (db *terminatedBehavior) Process(evt *event.Event) error {
-	return nil
-}
+func (db *terminatedBehavior) Process(evt *event.Event) {}
 
 func (db *terminatedBehavior) Recover(r interface{}) error {
 	return nil

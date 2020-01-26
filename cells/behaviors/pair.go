@@ -70,7 +70,7 @@ func (b *pairBehavior) Terminate() error {
 }
 
 // Process evaluates the received events for matching before timeout.
-func (b *pairBehavior) Process(evt *event.Event) error {
+func (b *pairBehavior) Process(evt *event.Event) {
 	ok := false
 	timestamp := evt.Timestamp()
 	b.payload, ok = b.matches(evt, b.payload)
@@ -80,12 +80,12 @@ func (b *pairBehavior) Process(evt *event.Event) error {
 	}
 	if !ok {
 		// Nothing to see, go on.
-		return nil
+		return
 	}
 	if b.matched == nil {
 		// First match.
 		b.matched = &timestamp
-		return nil
+		return
 	}
 	// Second match, check for timeout.
 	timeout := b.matched.Add(b.timespan)
@@ -96,7 +96,6 @@ func (b *pairBehavior) Process(evt *event.Event) error {
 		// Sorry, too late.
 		b.emitTimeout(timeout)
 	}
-	return nil
 }
 
 // Recover implements the cells.Behavior interface.

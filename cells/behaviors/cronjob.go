@@ -68,11 +68,10 @@ func (b *cronjobBehavior) Terminate() error {
 }
 
 // Process emits a ticker event each time the defined duration elapsed.
-func (b *cronjobBehavior) Process(evt *event.Event) error {
+func (b *cronjobBehavior) Process(evt *event.Event) {
 	if evt.Topic() == TopicTick {
 		b.cronjob(b.emitter)
 	}
-	return nil
 }
 
 // Recover from an error. Counter will be set back to the initial counter.

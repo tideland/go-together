@@ -14,6 +14,7 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 import (
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
+	"tideland.dev/go/together/fuse"
 	"tideland.dev/go/trace/logger"
 )
 
@@ -65,8 +66,8 @@ func (b *simpleBehavior) Terminate() error {
 }
 
 // Process calls the simple processor function.
-func (b *simpleBehavior) Process(evt *event.Event) error {
-	return b.process(b.emitter, evt)
+func (b *simpleBehavior) Process(evt *event.Event) {
+	fuse.Trigger(b.process(b.emitter, evt))
 }
 
 // Recover from an error.

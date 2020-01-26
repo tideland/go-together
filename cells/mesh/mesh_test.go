@@ -471,30 +471,29 @@ func (tb *TestBehavior) Terminate() error {
 	return nil
 }
 
-func (tb *TestBehavior) Process(evt *event.Event) error {
+func (tb *TestBehavior) Process(evt *event.Event) {
 	switch evt.Topic() {
 	case "set":
-		return evt.Payload().Do(func(key string, value *event.Value) error {
+		_ = evt.Payload().Do(func(key string, value *event.Value) error {
 			tb.datas[key] = value.AsInt(-1)
 			return nil
 		})
 	case "emit":
 		to := evt.Payload().At("to").AsString("<unknown>")
 		value := evt.Payload().At("value").AsInt(-1)
-		return tb.emitter.Emit(to, event.New("set", "value", value))
+		_ = tb.emitter.Emit(to, event.New("set", "value", value))
 	case "subscribers":
 		ids := tb.emitter.Subscribers()
 		for _, id := range ids {
 			tb.datas[id] = 1
 		}
 	case "length":
-		return tb.emitter.Broadcast(event.New("set", "length", len(tb.datas)))
+		_ = tb.emitter.Broadcast(event.New("set", "length", len(tb.datas)))
 	case "send":
-		return evt.Payload().Reply(event.NewPayload(tb.datas))
+		_ = evt.Payload().Reply(event.NewPayload(tb.datas))
 	case "clear":
 		tb.datas = make(map[string]int)
 	}
-	return nil
 }
 
 func (tb *TestBehavior) Recover(r interface{}) error {

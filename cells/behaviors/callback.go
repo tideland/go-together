@@ -14,6 +14,7 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 import (
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
+	"tideland.dev/go/together/fuse"
 	"tideland.dev/go/trace/logger"
 )
 
@@ -62,14 +63,10 @@ func (b *callbackBehavior) Terminate() error {
 }
 
 // ProcessEvent calls a callback functions with the event data.
-func (b *callbackBehavior) Process(evt *event.Event) error {
+func (b *callbackBehavior) Process(evt *event.Event) {
 	for _, callback := range b.callbacks {
-		if err := callback(b.emitter, evt); err != nil {
-			logger.Errorf("callback terminated with error: %v", err)
-			return err
-		}
+		fuse.Trigger(callback(b.emitter, evt))
 	}
-	return nil
 }
 
 // Recover from an error.

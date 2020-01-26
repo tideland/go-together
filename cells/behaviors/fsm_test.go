@@ -247,7 +247,7 @@ func (b *restorerBehavior) Terminate() error {
 	return nil
 }
 
-func (b *restorerBehavior) Process(evt *event.Event) error {
+func (b *restorerBehavior) Process(evt *event.Event) {
 	switch evt.Topic() {
 	case "grab-coins":
 		_ = b.emitter.Broadcast(event.New("cents", "cents", b.cents))
@@ -255,7 +255,6 @@ func (b *restorerBehavior) Process(evt *event.Event) error {
 	case "drop-coins":
 		b.cents += payloadCents(evt)
 	}
-	return nil
 }
 
 func (b *restorerBehavior) Recover(err interface{}) error {
