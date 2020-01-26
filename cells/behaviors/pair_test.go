@@ -34,8 +34,7 @@ func TestPairBehavior(t *testing.T) {
 	msh := mesh.New()
 
 	matchCount := make(map[string]int)
-	matchDone := make(chan struct{})
-	names := generator.Names(50000)
+	names := generator.Names(5000)
 	waitForName := generator.OneStringOf(names...)
 	matches := func(evt *event.Event, pl *event.Payload) (*event.Payload, bool) {
 		// Wait for a name visiting twice during timout.
@@ -49,7 +48,6 @@ func TestPairBehavior(t *testing.T) {
 	processor := func(emitter mesh.Emitter, evt *event.Event) error {
 		matchCount[evt.Topic()]++
 		if len(matchCount) == 2 {
-			close(matchDone)
 			sigc <- true
 		}
 		return nil
@@ -63,14 +61,9 @@ func TestPairBehavior(t *testing.T) {
 	assert.OK(msh.Subscribe("pairer", "processor"))
 
 	go func() {
-		for {
-			select {
-			case <-matchDone:
-				return
-			default:
-				name := generator.OneStringOf(names...)
-				assert.OK(msh.Emit("pairer", event.New("visitor", "name", name)))
-			}
+		for i := 0; i < 100000; i++ {
+			name := generator.OneStringOf(names...)
+			_ = msh.Emit("pairer", event.New("visitor", "name", name))
 		}
 	}()
 
