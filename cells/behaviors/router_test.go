@@ -41,7 +41,7 @@ func TestRouterBehavior(t *testing.T) {
 	}
 
 	assert.OK(msh.SpawnCells(
-		behaviors.NewMeshRouterBehavior("router", router),
+		behaviors.NewRouterBehavior("router", router),
 		behaviors.NewCollectorBehavior("test-1", 10, processor),
 		behaviors.NewCollectorBehavior("test-2", 10, processor),
 		behaviors.NewCollectorBehavior("test-3", 10, processor),

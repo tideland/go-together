@@ -22,9 +22,6 @@ import (
 // Emitter describes a behavior to emit events to subscribers. An instance
 // is passed during initialization.
 type Emitter interface {
-	// Mesh returns the mesh of the emitter.
-	Mesh() *Mesh
-
 	// Subscribers returns the the IDs of the subscriber cells.
 	Subscribers() []string
 

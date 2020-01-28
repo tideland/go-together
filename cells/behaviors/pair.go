@@ -14,8 +14,11 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 import (
 	"time"
 
+	"tideland.dev/go/dsa/identifier"
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
+	"tideland.dev/go/together/loop"
+	"tideland.dev/go/trace/failure"
 )
 
 //--------------------
@@ -23,19 +26,21 @@ import (
 //--------------------
 
 // PairCriterion is used by the pair behavior and has to return true, if
-// the passed event matches the wanted criterion. The given payload first
-// is an empty one, later the returned payload. This allows the matching
-// routine to maintain a state. In case of a timeout it will be reset.
-type PairCriterion func(evt *event.Event, pl *event.Payload) (*event.Payload, bool)
+// the passed event matches the wanted criterion. While there has been no
+// match the first event will be nil and the second the one to test. When
+// returning true the found one will be passed as first one so that the
+// function can compare.
+type PairCriterion func(first, second *event.Event) bool
 
 // pairBehavior checks if events occur in pairs.
 type pairBehavior struct {
-	id       string
-	emitter  mesh.Emitter
-	matches  PairCriterion
-	timespan time.Duration
-	payload  *event.Payload
-	matched  *time.Time
+	id          string
+	emitter     mesh.Emitter
+	matches     PairCriterion
+	timespan    time.Duration
+	tickerTopic string
+	loop        *loop.Loop
+	first       *event.Event
 }
 
 // NewPairBehavior creates a behavior checking if two events match a criterion
@@ -46,10 +51,10 @@ type pairBehavior struct {
 // the first data, and the timestamp of the timeout.
 func NewPairBehavior(id string, criterion PairCriterion, timespan time.Duration) mesh.Behavior {
 	return &pairBehavior{
-		id:       id,
-		matches:  criterion,
-		timespan: timespan,
-		payload:  event.NewPayload(),
+		id:          id,
+		matches:     criterion,
+		timespan:    timespan,
+		tickerTopic: identifier.NewUUID().String(),
 	}
 }
 
@@ -61,40 +66,44 @@ func (b *pairBehavior) ID() string {
 // Init the behavior.
 func (b *pairBehavior) Init(emitter mesh.Emitter) error {
 	b.emitter = emitter
+	l, err := loop.Go(b.worker)
+	if err != nil {
+		return failure.Annotate(err, "init pair behavior")
+	}
+	b.loop = l
 	return nil
 }
 
 // Terminate the behavior.
 func (b *pairBehavior) Terminate() error {
-	return nil
+	return b.loop.Stop()
 }
 
 // Process evaluates the received events for matching before timeout.
 func (b *pairBehavior) Process(evt *event.Event) {
-	ok := false
-	timestamp := evt.Timestamp()
-	b.payload, ok = b.matches(evt, b.payload)
-	if b.payload == nil {
-		// Criterion reset payload.
-		b.payload = event.NewPayload()
-	}
-	if !ok {
-		// Nothing to see, go on.
-		return
-	}
-	if b.matched == nil {
-		// First match.
-		b.matched = &timestamp
-		return
-	}
-	// Second match, check for timeout.
-	timeout := b.matched.Add(b.timespan)
-	if timeout.After(timestamp) {
-		// Event in time.
-		b.emitPair(timestamp)
-	} else {
-		// Sorry, too late.
-		b.emitTimeout(timeout)
+	switch evt.Topic() {
+	case b.tickerTopic:
+		if b.first == nil {
+			return
+		}
+		if b.first.Timestamp().Add(b.timespan).Before(evt.Timestamp()) {
+			// Timeout!
+			b.emitTimeout(evt)
+		}
+	default:
+		if b.matches(b.first, evt) {
+			if b.first == nil {
+				// First match.
+				b.first = evt
+				return
+			}
+			// Second match.
+			if b.first.Timestamp().Add(b.timespan).Before(evt.Timestamp()) {
+				// Timeout!
+				b.emitTimeout(evt)
+			}
+			b.emitPair(evt)
+		}
 	}
 }
 
@@ -103,27 +112,38 @@ func (b *pairBehavior) Recover(err interface{}) error {
 	return nil
 }
 
+// worker is the sending a cleanup tick to itself.
+func (b *pairBehavior) worker(lt loop.Terminator) error {
+	ticker := time.NewTicker(b.timespan)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-lt.Done():
+			return nil
+		case <-ticker.C:
+			b.emitter.Self(event.New(b.tickerTopic))
+		}
+	}
+}
+
 // emitPair emits the event for a successful pair.
-func (b *pairBehavior) emitPair(timestamp time.Time) {
+func (b *pairBehavior) emitPair(evt *event.Event) {
 	_ = b.emitter.Broadcast(event.New(
 		TopicPair,
-		"first", *b.matched,
-		"second", timestamp,
-		"payload", b.payload,
+		"first", b.first,
+		"second", evt,
 	))
-	b.payload = event.NewPayload()
-	b.matched = nil
+	b.first = nil
 }
 
 // emitTimeout emits the event for a pairing timeout.
-func (b *pairBehavior) emitTimeout(timeout time.Time) {
+func (b *pairBehavior) emitTimeout(evt *event.Event) {
 	_ = b.emitter.Broadcast(event.New(
 		TopicPairTimeout,
-		"payload", b.payload,
-		"timeout", timeout,
+		"first", b.first,
+		"timeout", evt,
 	))
-	b.payload = event.NewPayload()
-	b.matched = nil
+	b.first = nil
 }
 
 // EOF

@@ -26,51 +26,39 @@ import (
 // TESTS
 //--------------------
 
-// TestPairBehavior tests the event pair behavior.
+// TestPairBehavior tests the event pair behavior finding a pair.
 func TestPairBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	sigc := asserts.MakeWaitChan()
 	generator := generators.New(generators.FixedRand())
-	msh := mesh.New()
-
-	matchCount := make(map[string]int)
 	names := generator.Names(5000)
-	waitForName := generator.OneStringOf(names...)
-	matches := func(evt *event.Event, pl *event.Payload) (*event.Payload, bool) {
-		// Wait for a name visiting twice during timout.
-		name := evt.Payload().At("name").AsString("<none>")
-		if name == waitForName {
+	matches := func(first, second *event.Event) bool {
+		if first == nil {
+			// First one.
+			return true
+		}
+		s1 := first.Payload().At("name").AsString("<first>")
+		s2 := second.Payload().At("name").AsString("<second>")
+		if s1 == s2 {
 			// Hit!
-			return event.NewPayload("name", name), true
+			return true
 		}
-		return pl, false
+		return false
 	}
-	processor := func(emitter mesh.Emitter, evt *event.Event) error {
-		matchCount[evt.Topic()]++
-		if len(matchCount) == 2 {
-			sigc <- true
-		}
-		return nil
+	timespan := 5 * time.Millisecond
+	plant := mesh.NewTestPlant(assert, behaviors.NewPairBehavior("pb", matches, timespan), 1)
+	defer plant.Stop()
+
+	for i := 0; i < 100000; i++ {
+		name := generator.OneStringOf(names...)
+		plant.Emit(event.New("visitor", "name", name))
 	}
-	timespan := 10 * time.Millisecond
 
-	assert.OK(msh.SpawnCells(
-		behaviors.NewPairBehavior("pairer", matches, timespan),
-		behaviors.NewSimpleProcessorBehavior("processor", processor),
-	))
-	assert.OK(msh.Subscribe("pairer", "processor"))
-
-	go func() {
-		for i := 0; i < 100000; i++ {
-			name := generator.OneStringOf(names...)
-			_ = msh.Emit("pairer", event.New("visitor", "name", name))
-		}
-	}()
-
-	assert.Wait(sigc, true, 30*time.Second)
-	assert.OK(matchCount[behaviors.TopicPair] > 0)
-	assert.OK(matchCount[behaviors.TopicPairTimeout] > 0)
-	assert.OK(msh.Stop())
+	plant.AssertFind("sub-0", func(evt *event.Event) bool {
+		return evt.Topic() == behaviors.TopicPair
+	})
+	plant.AssertFind("sub-0", func(evt *event.Event) bool {
+		return evt.Topic() == behaviors.TopicPairTimeout
+	})
 }
 
 // EOF

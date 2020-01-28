@@ -62,11 +62,6 @@ func newCell(msh *Mesh, behavior Behavior) (*cell, error) {
 	return c, nil
 }
 
-// Mesh is part of the emitter interface and returns the mesh of the emitter.
-func (c *cell) Mesh() *Mesh {
-	return c.msh
-}
-
 // Subscribers is part of the emitter interface and returns the
 // the IDs of the subscriber cells.
 func (c *cell) Subscribers() []string {

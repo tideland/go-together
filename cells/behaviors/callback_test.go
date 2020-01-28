@@ -13,7 +13,6 @@ package behaviors_test // import "tideland.dev/go/together/cells/behaviors"
 
 import (
 	"testing"
-	"time"
 
 	"tideland.dev/go/audit/asserts"
 	"tideland.dev/go/together/cells/behaviors"
@@ -28,36 +27,26 @@ import (
 // TestCallbackBehavior tests the callback behavior.
 func TestCallbackBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	msh := mesh.New()
-	defer assert.NoError(msh.Stop())
-
-	cbdA := []string{}
 	cbfA := func(emitter mesh.Emitter, evt *event.Event) error {
-		cbdA = append(cbdA, evt.Topic())
-		return nil
+		return emitter.Emit("sub-0", evt)
 	}
-	cbdB := 0
 	cbfB := func(emitter mesh.Emitter, evt *event.Event) error {
-		cbdB++
-		return nil
+		return emitter.Emit("sub-1", evt)
 	}
-	sigc := asserts.MakeWaitChan()
 	cbfC := func(emitter mesh.Emitter, evt *event.Event) error {
-		if evt.Topic() == "baz" {
-			sigc <- true
-		}
+		emitter.Emit("sub-0", evt)
+		emitter.Emit("sub-1", evt)
 		return nil
 	}
+	plant := mesh.NewTestPlant(assert, behaviors.NewCallbackBehavior("cb", cbfA, cbfB, cbfC), 2)
+	defer plant.Stop()
 
-	assert.NoError(msh.SpawnCells(behaviors.NewCallbackBehavior("callback", cbfA, cbfB, cbfC)))
+	plant.Emit(event.New("foo"))
+	plant.Emit(event.New("bar"))
+	plant.Emit(event.New("baz"))
 
-	assert.NoError(msh.Emit("callback", event.New("foo")))
-	assert.NoError(msh.Emit("callback", event.New("bar")))
-	assert.NoError(msh.Emit("callback", event.New("baz")))
-
-	assert.Wait(sigc, true, time.Second)
-	assert.Equal(cbdA, []string{"foo", "bar", "baz"})
-	assert.Equal(cbdB, 3)
+	plant.AssertLength("sub-0", 6)
+	plant.AssertLength("sub-1", 6)
 }
 
 // EOF

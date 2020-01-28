@@ -1,7 +1,12 @@
+github.com/google/uuid v1.1.1 h1:Gkbcsh/GbpXz7lPftLA3P6TYMwjCLYm83jiFQZF/3gY=
+github.com/google/uuid v1.1.1/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+tideland.dev/go v0.2.0 h1:JC/dwuqqn8NfU2jTNytDCjzbUTsWFGj1V2XfYJn0MKI=
 tideland.dev/go/audit v0.3.0 h1:zUEjdr279z7OE+iFsqz8xQm4KrLRxARmUSg5TzlO2RY=
 tideland.dev/go/audit v0.3.0/go.mod h1:iVQWp3A7czp2I4eH9nHERMMqljQRuwqTKuEzxoj9crI=
 tideland.dev/go/audit v0.3.3 h1:SafD13c5Vb2tBNv3lhusX40XojChllP6WsWziQxewJg=
 tideland.dev/go/audit v0.3.3/go.mod h1:iVQWp3A7czp2I4eH9nHERMMqljQRuwqTKuEzxoj9crI=
+tideland.dev/go/dsa v0.3.0 h1:zIZDlIvVgzspyypZZfJsZqDQMVFAPEoBGbrR2xy942A=
+tideland.dev/go/dsa v0.3.0/go.mod h1:8wQ77lLGRU3IRovPKxjHDBpj48u/QyYR5L3YWQFrwn0=
 tideland.dev/go/net v0.3.0 h1:77CRbvjTSrgGIAIrhCnND56hazlZmvgH0jASkQAsR4M=
 tideland.dev/go/net v0.3.0/go.mod h1:QMHLS1JtVVG2/ovw7WjUYkiCS2gz2izFot5ewncLgjs=
 tideland.dev/go/together v0.0.0-20200110213028-8f143e2737a6/go.mod h1:g+TjCwnKorfsYdJk0XwGYeP3mxSvF1MbnWoQpKk3Y+U=

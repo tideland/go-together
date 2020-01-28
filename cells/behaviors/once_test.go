@@ -13,7 +13,6 @@ package behaviors_test // import "tideland.dev/go/together/cells/behaviors"
 
 import (
 	"testing"
-	"time"
 
 	"tideland.dev/go/audit/asserts"
 	"tideland.dev/go/together/cells/behaviors"
@@ -28,26 +27,20 @@ import (
 // TestOnceBehavior tests the once behavior.
 func TestOnceBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	sigc := asserts.MakeWaitChan()
-	msh := mesh.New()
-
 	oneTimer := func(emitter mesh.Emitter, evt *event.Event) error {
-		topic := evt.Topic()
-		sigc <- topic
-		return emitter.Broadcast(event.New(topic + "/" + topic))
+		return emitter.Broadcast(evt)
 	}
-	assert.OK(msh.SpawnCells(
-		behaviors.NewOnceBehavior("first", oneTimer),
-		behaviors.NewOnceBehavior("second", oneTimer),
-	))
-	assert.OK(msh.Subscribe("first", "second"))
+	plant := mesh.NewTestPlant(assert, behaviors.NewOnceBehavior("ob", oneTimer), 1)
+	defer plant.Stop()
 
-	assert.OK(msh.Emit("first", event.New("foo")))
-	assert.OK(msh.Emit("first", event.New("bar")))
+	plant.Emit(event.New("foo"))
+	plant.Emit(event.New("bar"))
+	plant.Emit(event.New("baz"))
 
-	assert.Wait(sigc, "foo", time.Second)
-	assert.Wait(sigc, "foo/foo", time.Second)
-	assert.OK(msh.Stop())
+	plant.AssertLength("sub-0", 1)
+	plant.AssertAll("sub-0", func(evt *event.Event) bool {
+		return evt.Topic() == "foo"
+	})
 }
 
 // EOF
