@@ -34,9 +34,10 @@ func TestCallbackBehavior(t *testing.T) {
 		return emitter.Emit("sub-1", evt)
 	}
 	cbfC := func(emitter mesh.Emitter, evt *event.Event) error {
-		emitter.Emit("sub-0", evt)
-		emitter.Emit("sub-1", evt)
-		return nil
+		if err := emitter.Emit("sub-0", evt); err != nil {
+			return err
+		}
+		return emitter.Emit("sub-1", evt)
 	}
 	plant := mesh.NewTestPlant(assert, behaviors.NewCallbackBehavior("cb", cbfA, cbfB, cbfC), 2)
 	defer plant.Stop()

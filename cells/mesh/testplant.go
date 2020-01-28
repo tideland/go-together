@@ -14,6 +14,7 @@ package mesh // import "tideland.dev/go/together/cells/mesh"
 import (
 	"errors"
 	"strconv"
+	"sync"
 
 	"tideland.dev/go/audit/asserts"
 	"tideland.dev/go/together/cells/event"
@@ -57,7 +58,7 @@ func (es *emitterStub) Broadcast(evt *event.Event) error {
 
 // Self emits the given event back to the cell itself.
 func (es *emitterStub) Self(evt *event.Event) {
-	go es.tp.behavior.Process(evt)
+	go es.tp.Emit(evt)
 }
 
 // behaviorStub collects events for later tests.
@@ -97,8 +98,8 @@ func (bs *behaviorStub) Recover(err interface{}) error {
 
 // TestPlant provides help to test a behavior
 type TestPlant struct {
+	mu          sync.Mutex
 	assert      *asserts.Asserts
-	reset       func()
 	behavior    Behavior
 	subscribers map[string]*behaviorStub
 }
@@ -126,6 +127,8 @@ func NewTestPlant(assert *asserts.Asserts, behavior Behavior, subscribers int) *
 
 // Emit passes an event to the behavior to test.
 func (tp *TestPlant) Emit(evt *event.Event) {
+	tp.mu.Lock()
+	defer tp.mu.Unlock()
 	defer func() {
 		if r := recover(); r != nil {
 			// TODO Add way to test wanted recoverings.

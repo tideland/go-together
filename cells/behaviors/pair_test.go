@@ -38,11 +38,7 @@ func TestPairBehavior(t *testing.T) {
 		}
 		s1 := first.Payload().At("name").AsString("<first>")
 		s2 := second.Payload().At("name").AsString("<second>")
-		if s1 == s2 {
-			// Hit!
-			return true
-		}
-		return false
+		return s1 == s2
 	}
 	timespan := 5 * time.Millisecond
 	plant := mesh.NewTestPlant(assert, behaviors.NewPairBehavior("pb", matches, timespan), 1)
