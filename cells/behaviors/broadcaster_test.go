@@ -13,7 +13,6 @@ package behaviors_test // import "tideland.dev/go/together/cells/behaviors"
 
 import (
 	"testing"
-	"time"
 
 	"tideland.dev/go/audit/asserts"
 	"tideland.dev/go/together/cells/behaviors"
@@ -28,35 +27,16 @@ import (
 // TestBroadcasterBehavior tests the broadcast behavior.
 func TestBroadcasterBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	sigc := asserts.MakeWaitChan()
-	msh := mesh.New()
-	defer assert.NoError(msh.Stop())
+	plant := mesh.NewTestPlant(assert, behaviors.NewBroadcasterBehavior("bb"), 5)
+	defer plant.Stop()
 
-	mktester := func() behaviors.ConditionTester {
-		counter := 0
-		return func(evt *event.Event) bool {
-			counter++
-			return counter == 3
-		}
+	plant.Emit(event.New("a"))
+	plant.Emit(event.New("b"))
+	plant.Emit(event.New("c"))
+
+	for _, id := range []string{"sub-0", "sub-1", "sub-2", "sub-3", "sub-4"} {
+		plant.AssertLength(id, 3)
 	}
-	processor := func(emitter mesh.Emitter, evt *event.Event) error {
-		sigc <- true
-		return nil
-	}
-
-	assert.NoError(msh.SpawnCells(
-		behaviors.NewBroadcasterBehavior("broadcast"),
-		behaviors.NewConditionBehavior("test-a", mktester(), processor),
-		behaviors.NewConditionBehavior("test-b", mktester(), processor),
-	))
-	assert.NoError(msh.Subscribe("broadcast", "test-a", "test-b"))
-
-	assert.NoError(msh.Emit("broadcast", event.New("test")))
-	assert.NoError(msh.Emit("broadcast", event.New("test")))
-	assert.NoError(msh.Emit("broadcast", event.New("test")))
-
-	assert.Wait(sigc, true, time.Second)
-	assert.Wait(sigc, true, time.Second)
 }
 
 // EOF

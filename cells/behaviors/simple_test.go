@@ -12,7 +12,6 @@ package behaviors_test // import "tideland.dev/go/together/cells/behaviors"
 //--------------------
 
 import (
-	"sync"
 	"testing"
 
 	"tideland.dev/go/audit/asserts"
@@ -28,28 +27,17 @@ import (
 // TestSimpleProcessorBehavior tests the simple processor behavior.
 func TestSimpleProcessorBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	msh := mesh.New()
-
-	topics := []string{}
-	var wg sync.WaitGroup
 	spf := func(emitter mesh.Emitter, evt *event.Event) error {
-		topics = append(topics, evt.Topic())
-		wg.Done()
-		return nil
+		return emitter.Broadcast(evt)
 	}
+	plant := mesh.NewTestPlant(assert, behaviors.NewSimpleProcessorBehavior("simple", spf), 1)
+	defer plant.Stop()
 
-	assert.OK(msh.SpawnCells(
-		behaviors.NewSimpleProcessorBehavior("simple", spf),
-	))
+	plant.Emit(event.New("foo"))
+	plant.Emit(event.New("bar"))
+	plant.Emit(event.New("baz"))
 
-	wg.Add(3)
-	assert.OK(msh.Emit("simple", event.New("foo")))
-	assert.OK(msh.Emit("simple", event.New("bar")))
-	assert.OK(msh.Emit("simple", event.New("baz")))
-
-	wg.Wait()
-	assert.Length(topics, 3)
-	assert.OK(msh.Stop())
+	plant.AssertLength("sub-0", 3)
 }
 
 // EOF

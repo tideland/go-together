@@ -96,7 +96,24 @@ func (bs *behaviorStub) Recover(err interface{}) error {
 // TESTPLANT
 //--------------------
 
-// TestPlant provides help to test a behavior
+// TestPlant provides help to test behaviors. It is instantiated with an Asserts
+// instance, the behavior, and a wanted number of subscribers. Those do get the
+// IDs "sub-0" to "sub-*" and simply collect the events emitted by the behavior.
+// Then events can be emitted to the behavior so it can do its work. Afterwards
+// the AssertsXyz() methods can be used to test the collected events per subscriber.
+//
+//     plant := mesh.NewTestPlant(assert, NewMyBehavior("myID"), 2)
+//     defer plant.Stop()
+//
+//     plant.Emit(event.New("foo"))
+//     plant.Emit(event.New("bar"))
+//
+//     plant.AssertLength("sub-0", 2)
+//     plant.AssertFind("sub-1", func(evt *event.Event) bool {
+//         return evt.Topic() == "bar"
+//     })
+//
+// The Stop() at the end ensures the call of the Terminate() method of the behavior.
 type TestPlant struct {
 	mu          sync.Mutex
 	assert      *asserts.Asserts
