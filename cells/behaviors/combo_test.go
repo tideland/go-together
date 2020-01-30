@@ -13,7 +13,6 @@ package behaviors_test // import "tideland.dev/go/together/cells/behaviors"
 
 import (
 	"testing"
-	"time"
 
 	"tideland.dev/go/audit/asserts"
 	"tideland.dev/go/audit/generators"
@@ -31,10 +30,7 @@ import (
 func TestComboBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	generator := generators.New(generators.FixedRand())
-	sigc := asserts.MakeWaitChan()
-	msh := mesh.New()
-	defer assert.NoError(msh.Stop())
-
+	topics := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i"}
 	matcher := func(accessor event.SinkAccessor) (event.CriterionMatch, *event.Payload) {
 		analyzer := event.NewSinkAnalyzer(accessor)
 		combo := map[string]int{
@@ -69,40 +65,20 @@ func TestComboBehavior(t *testing.T) {
 		)
 		return event.CriterionDone, pl
 	}
-	processor := func(accessor event.SinkAccessor) (*event.Payload, error) {
-		analyzer := event.NewSinkAnalyzer(accessor)
-		ok, err := analyzer.Match(func(index int, evt *event.Event) (bool, error) {
-			pl := evt.Payload()
-			if len(pl.Keys()) != 4 {
-				return false, nil
-			}
-			for _, key := range pl.Keys() {
-				count := pl.At(key).AsInt(0)
-				if count == 0 {
-					return false, nil
-				}
-			}
-			return true, nil
-		})
-		sigc <- ok
-		return nil, err
-	}
-
-	topics := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "now"}
-
-	assert.NoError(msh.SpawnCells(
-		behaviors.NewComboBehavior("combiner", matcher),
-		behaviors.NewCollectorBehavior("collector", 100, processor),
-	))
-	assert.NoError(msh.Subscribe("combiner", "collector"))
+	plant := mesh.NewTestPlant(assert, behaviors.NewComboBehavior("combiner", matcher), 1)
+	defer plant.Stop()
 
 	for i := 0; i < 1000; i++ {
 		topic := generator.OneStringOf(topics...)
-		assert.NoError(msh.Emit("combiner", event.New(topic)))
+		plant.Emit(event.New(topic))
 	}
-
-	assert.NoError(msh.Emit("collector", event.New(event.TopicProcess)))
-	assert.Wait(sigc, true, time.Minute)
+	plant.AssertAll("sub-0", func(evt *event.Event) bool {
+		return evt.Topic() == behaviors.TopicComboComplete &&
+			evt.Payload().At("a").AsInt(0) > 0 &&
+			evt.Payload().At("b").AsInt(0) > 0 &&
+			evt.Payload().At("c").AsInt(0) > 0 &&
+			evt.Payload().At("d").AsInt(0) > 0
+	})
 }
 
 // EOF
