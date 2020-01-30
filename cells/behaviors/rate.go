@@ -37,7 +37,7 @@ type rateBehavior struct {
 	durations []time.Duration
 }
 
-// NewRateBehavior creates an even rate measuiring behavior. Each time the
+// NewRateBehavior creates an even rate measuring behavior. Each time the
 // criterion function returns true for a received event the duration between
 // this and the last one is calculated and emitted together with the timestamp.
 // Additionally a moving average, lowest, and highest duration is calculated

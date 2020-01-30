@@ -13,7 +13,6 @@ package behaviors_test // import "tideland.dev/go/together/cells/behaviors"
 
 import (
 	"testing"
-	"time"
 
 	"tideland.dev/go/audit/asserts"
 	"tideland.dev/go/together/cells/behaviors"
@@ -28,38 +27,12 @@ import (
 // TestFilterBehavior tests the filter behavior.
 func TestFilterBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	sigc := asserts.MakeWaitChan()
-	selects := 0
-	excludes := 0
-	msh := mesh.New()
-	defer assert.NoError(msh.Stop())
-
 	filter := func(evt *event.Event) (bool, error) {
 		payload := evt.Payload().At("test").AsString("")
 		return evt.Topic() == payload, nil
 	}
-	selectConditioner := func(evt *event.Event) bool {
-		selects++
-		return selects == 2
-	}
-	excludesConditioner := func(evt *event.Event) bool {
-		excludes++
-		return excludes == 4
-	}
-	processor := func(emitter mesh.Emitter, evt *event.Event) error {
-		sigc <- true
-		return nil
-	}
 
-	assert.NoError(msh.SpawnCells(
-		behaviors.NewSelectFilterBehavior("select", filter),
-		behaviors.NewConditionBehavior("selects", selectConditioner, processor),
-		behaviors.NewExcludeFilterBehavior("exclude", filter),
-		behaviors.NewConditionBehavior("excludes", excludesConditioner, processor),
-	))
-	assert.NoError(msh.Subscribe("select", "selects"))
-	assert.NoError(msh.Subscribe("exclude", "excludes"))
-
+	plant := mesh.NewTestPlant(assert, behaviors.NewSelectFilterBehavior("sfb", filter), 1)
 	data := [][2]string{
 		{"a", "a"},
 		{"a", "b"},
@@ -69,14 +42,25 @@ func TestFilterBehavior(t *testing.T) {
 		{"b", "a"},
 	}
 	for _, d := range data {
-		assert.NoError(msh.Emit("select", event.New(d[0], "test", d[1])))
+		plant.Emit(event.New(d[0], "test", d[1]))
 	}
-	assert.Wait(sigc, true, time.Second)
+	plant.AssertLength("sub-0", 2)
+	plant.Stop()
 
-	for _, d := range data {
-		assert.NoError(msh.Emit("exclude", event.New(d[0], "test", d[1])))
+	plant = mesh.NewTestPlant(assert, behaviors.NewExcludeFilterBehavior("efb", filter), 1)
+	data = [][2]string{
+		{"a", "a"},
+		{"a", "b"},
+		{"a", "c"},
+		{"a", "d"},
+		{"b", "b"},
+		{"b", "a"},
 	}
-	assert.Wait(sigc, true, time.Second)
+	for _, d := range data {
+		plant.Emit(event.New(d[0], "test", d[1]))
+	}
+	plant.AssertLength("sub-0", 4)
+	plant.Stop()
 }
 
 // EOF
