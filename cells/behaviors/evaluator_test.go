@@ -14,7 +14,6 @@ package behaviors_test // import "tideland.dev/go/together/cells/behaviors"
 import (
 	"strconv"
 	"testing"
-	"time"
 
 	"tideland.dev/go/audit/asserts"
 	"tideland.dev/go/together/cells/behaviors"
@@ -26,136 +25,85 @@ import (
 // TESTS
 //--------------------
 
-// TestEvaluatorBehavior tests the evaluator behavior.
+// TestEvaluatorBehavior verifies the evaluating of events.
 func TestEvaluatorBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	sigc := asserts.MakeWaitChan()
-	msh := mesh.New()
-	defer assert.NoError(msh.Stop())
-
 	evaluator := func(evt *event.Event) (float64, error) {
-		i, err := strconv.Atoi(evt.Topic())
-		return float64(i), err
+		f, err := strconv.ParseFloat(evt.Topic(), 64)
+		return f, err
 	}
-	processor := func(accessor event.SinkAccessor) (*event.Payload, error) {
-		evt, ok := accessor.PeekLast()
-		assert.True(ok)
-		sigc <- evt
-		return nil, nil
-	}
-
-	assert.NoError(msh.SpawnCells(
-		behaviors.NewEvaluatorBehavior("evaluator", evaluator),
-		behaviors.NewCollectorBehavior("collector", 1000, processor),
-	))
-	assert.NoError(msh.Subscribe("evaluator", "collector"))
+	plant := mesh.NewTestPlant(assert, behaviors.NewEvaluatorBehavior("eb", evaluator), 1)
+	defer plant.Stop()
 
 	// Standard evaluating.
 	topics := []string{"2", "1", "1", "1", "3", "2", "3", "1", "3", "9"}
 	for _, topic := range topics {
-		assert.NoError(msh.Emit("evaluator", event.New(topic)))
+		plant.Emit(event.New(topic))
 	}
-	time.Sleep(100 * time.Millisecond)
-
-	assert.NoError(msh.Emit("collector", event.New(event.TopicProcess)))
-	assert.NoError(msh.Emit("collector", event.New(event.TopicReset)))
-
-	assert.WaitTested(sigc, func(value interface{}) error {
-		evt, ok := value.(*event.Event)
-		assert.True(ok)
-		assert.Equal(evt.Payload().At("count").AsInt(0), 10)
-		assert.Equal(evt.Payload().At("min-rating").AsFloat64(0.0), 1.0)
-		assert.Equal(evt.Payload().At("max-rating").AsFloat64(0.0), 9.0)
-		assert.Equal(evt.Payload().At("avg-rating").AsFloat64(0.0), 2.6)
-		assert.Equal(evt.Payload().At("med-rating").AsFloat64(0.0), 2.0)
-		return nil
-	}, time.Second)
+	plant.AssertFind("sub-0", func(evt *event.Event) bool {
+		return evt.Topic() == behaviors.TopicEvaluation &&
+			evt.Payload().At("count").AsInt(0) == 10 &&
+			evt.Payload().At("min-rating").AsFloat64(0.0) == 1.0 &&
+			evt.Payload().At("max-rating").AsFloat64(0.0) == 9.0 &&
+			evt.Payload().At("avg-rating").AsFloat64(0.0) == 2.6 &&
+			evt.Payload().At("med-rating").AsFloat64(0.0) == 2.0
+	})
 
 	// Reset and check with only one value.
-	assert.NoError(msh.Emit("evaluator", event.New(event.TopicReset)))
-	assert.NoError(msh.Emit("evaluator", event.New("1234")))
-	time.Sleep(100 * time.Millisecond)
+	plant.Emit(event.New(event.TopicReset))
+	plant.Emit(event.New("1234"))
 
-	assert.NoError(msh.Emit("collector", event.New(event.TopicProcess)))
-	assert.NoError(msh.Emit("collector", event.New(event.TopicReset)))
-
-	assert.WaitTested(sigc, func(value interface{}) error {
-		evt, ok := value.(*event.Event)
-		assert.True(ok)
-		assert.Equal(evt.Payload().At("count").AsInt(0), 1)
-		assert.Equal(evt.Payload().At("min-rating").AsFloat64(0.0), 1234.0)
-		assert.Equal(evt.Payload().At("max-rating").AsFloat64(0.0), 1234.0)
-		assert.Equal(evt.Payload().At("avg-rating").AsFloat64(0.0), 1234.0)
-		assert.Equal(evt.Payload().At("med-rating").AsFloat64(0.0), 1234.0)
-		return nil
-	}, time.Second)
+	plant.AssertFind("sub-0", func(evt *event.Event) bool {
+		return evt.Topic() == behaviors.TopicEvaluation &&
+			evt.Payload().At("count").AsInt(0) == 1 &&
+			evt.Payload().At("min-rating").AsFloat64(0.0) == 1234.0 &&
+			evt.Payload().At("max-rating").AsFloat64(0.0) == 1234.0 &&
+			evt.Payload().At("avg-rating").AsFloat64(0.0) == 1234.0 &&
+			evt.Payload().At("med-rating").AsFloat64(0.0) == 1234.0
+	})
 
 	// Crash evaluating.
+	plant.Emit(event.New(event.TopicReset))
 	topics = []string{"2", "1", "3", "4", "crash", "1", "2", "1", "2", "1"}
 	for _, topic := range topics {
-		assert.NoError(msh.Emit("evaluator", event.New(topic)))
+		plant.Emit(event.New(topic))
 	}
-	time.Sleep(100 * time.Millisecond)
 
-	assert.NoError(msh.Emit("collector", event.New(event.TopicProcess)))
-	assert.NoError(msh.Emit("collector", event.New(event.TopicReset)))
-
-	assert.WaitTested(sigc, func(value interface{}) error {
-		evt, ok := value.(*event.Event)
-		assert.True(ok)
-		assert.Equal(evt.Payload().At("count").AsInt(0), 5)
-		assert.Equal(evt.Payload().At("min-rating").AsFloat64(0.0), 1.0)
-		assert.Equal(evt.Payload().At("max-rating").AsFloat64(0.0), 2.0)
-		assert.Equal(evt.Payload().At("avg-rating").AsFloat64(0.0), 1.4)
-		assert.Equal(evt.Payload().At("med-rating").AsFloat64(0.0), 1.0)
-		return nil
-	}, time.Second)
+	plant.AssertFind("sub-0", func(evt *event.Event) bool {
+		return evt.Topic() == behaviors.TopicEvaluation &&
+			evt.Payload().At("count").AsInt(0) == 5 &&
+			evt.Payload().At("min-rating").AsFloat64(0.0) == 1.0 &&
+			evt.Payload().At("max-rating").AsFloat64(0.0) == 2.0 &&
+			evt.Payload().At("avg-rating").AsFloat64(0.0) == 1.4 &&
+			evt.Payload().At("med-rating").AsFloat64(0.0) == 1.0
+	})
 }
 
-// TestLimitedEvaluatorBehavior tests the limited evaluator behavior.
-func TestLimitedEvaluatorBehavior(t *testing.T) {
+// TestMovingEvaluatorBehavior tests the evaluator behavior with a
+// moving number of values.
+func TestMovingEvaluatorBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	sigc := asserts.MakeWaitChan()
-	msh := mesh.New()
-	defer assert.NoError(msh.Stop())
-
 	evaluator := func(evt *event.Event) (float64, error) {
-		i, err := strconv.Atoi(evt.Topic())
-		return float64(i), err
+		f, err := strconv.ParseFloat(evt.Topic(), 64)
+		return f, err
 	}
-	processor := func(accessor event.SinkAccessor) (*event.Payload, error) {
-		evt, ok := accessor.PeekLast()
-		assert.True(ok)
-		sigc <- evt
-		return nil, nil
-	}
-
-	assert.NoError(msh.SpawnCells(
-		behaviors.NewMovingEvaluatorBehavior("evaluator", evaluator, 5),
-		behaviors.NewCollectorBehavior("collector", 1000, processor),
-	))
-	assert.NoError(msh.Subscribe("evaluator", "collector"))
+	plant := mesh.NewTestPlant(assert, behaviors.NewMovingEvaluatorBehavior("evaluator", evaluator, 5), 1)
+	defer plant.Stop()
 
 	// Standard evaluating.
 	topics := []string{"1", "2", "1", "1", "9", "2", "3", "1", "3", "2"}
 	for _, topic := range topics {
-		assert.NoError(msh.Emit("evaluator", event.New(topic)))
+		plant.Emit(event.New(topic))
 	}
-	time.Sleep(100 * time.Millisecond)
 
-	assert.NoError(msh.Emit("collector", event.New(event.TopicProcess)))
-	assert.NoError(msh.Emit("collector", event.New(event.TopicReset)))
-
-	assert.WaitTested(sigc, func(value interface{}) error {
-		evt, ok := value.(*event.Event)
-		assert.True(ok)
-		assert.Equal(evt.Payload().At("count").AsInt(0), 5)
-		assert.Equal(evt.Payload().At("min-rating").AsFloat64(0.0), 1.0)
-		assert.Equal(evt.Payload().At("max-rating").AsFloat64(0.0), 3.0)
-		assert.Equal(evt.Payload().At("avg-rating").AsFloat64(0.0), 2.2)
-		assert.Equal(evt.Payload().At("med-rating").AsFloat64(0.0), 2.0)
-		return nil
-	}, time.Second)
+	plant.AssertFind("sub-0", func(evt *event.Event) bool {
+		return evt.Topic() == behaviors.TopicEvaluation &&
+			evt.Payload().At("count").AsInt(0) == 5 &&
+			evt.Payload().At("min-rating").AsFloat64(0.0) == 1.0 &&
+			evt.Payload().At("max-rating").AsFloat64(0.0) == 3.0 &&
+			evt.Payload().At("avg-rating").AsFloat64(0.0) == 2.2 &&
+			evt.Payload().At("med-rating").AsFloat64(0.0) == 2.0
+	})
 }
 
 // EOF
