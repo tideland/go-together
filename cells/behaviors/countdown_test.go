@@ -13,7 +13,6 @@ package behaviors_test // import "tideland.dev/go/together/cells/behaviors"
 
 import (
 	"testing"
-	"time"
 
 	"tideland.dev/go/audit/asserts"
 	"tideland.dev/go/together/cells/behaviors"
@@ -28,35 +27,21 @@ import (
 // TestCountdownBehavior tests the countdown of events.
 func TestCountdownBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	sigc := asserts.MakeWaitChan()
-	msh := mesh.New()
-	defer assert.NoError(msh.Stop())
-
 	zeroer := func(accessor event.SinkAccessor) (*event.Event, int, error) {
 		at := accessor.Len()
-		evt := event.New("zero", at)
+		evt := event.New("zero", "after", at)
 		return evt, at - 1, nil
 	}
-	tester := func(evt *event.Event) bool {
-		return evt.Topic() == "zero"
-	}
-	processor := func(emitter mesh.Emitter, evt *event.Event) error {
-		sigc <- evt.Topic()
-		return nil
-	}
-
-	assert.NoError(msh.SpawnCells(
-		behaviors.NewCountdownBehavior("countdowner", 5, zeroer),
-		behaviors.NewConditionBehavior("conditioner", tester, processor),
-	))
-	assert.NoError(msh.Subscribe("countdowner", "conditioner"))
+	plant := mesh.NewTestPlant(assert, behaviors.NewCountdownBehavior("cb", 5, zeroer), 1)
+	defer plant.Stop()
 
 	countdown := func(ct int) {
 		for i := 0; i < ct; i++ {
-			err := msh.Emit("countdowner", event.New("count"))
-			assert.Nil(err)
+			plant.Emit(event.New("count"))
 		}
-		assert.Wait(sigc, "zero", time.Second)
+		plant.AssertFind("sub-0", func(evt *event.Event) bool {
+			return evt.Topic() == "zero" && evt.Payload().At("after").AsInt(-1) == ct
+		})
 	}
 
 	countdown(5)
