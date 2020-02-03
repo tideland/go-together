@@ -176,10 +176,10 @@ func (tp *TestPlant) AssertLength(idx int, length int) {
 func (tp *TestPlant) AssertAll(idx int, test func(*event.Event) bool) {
 	tp.assert.OK(idx < len(tp.subscribers), "subscriber not found")
 	subscriber := tp.subscribers[idx]
-	subscriber.sink.Do(func(i int, evt *event.Event) error {
+	tp.assert.OK(subscriber.sink.Do(func(i int, evt *event.Event) error {
 		tp.assert.OK(test(evt), "test failed at", strconv.Itoa(i))
 		return nil
-	})
+	}))
 }
 
 // AssertFind tests if the collected events of a given subscriber contain
@@ -188,10 +188,10 @@ func (tp *TestPlant) AssertFind(idx int, matches func(*event.Event) bool) {
 	tp.assert.OK(idx < len(tp.subscribers), "subscriber not found")
 	subscriber := tp.subscribers[idx]
 	ok := false
-	subscriber.sink.Do(func(i int, evt *event.Event) error {
+	tp.assert.OK(subscriber.sink.Do(func(i int, evt *event.Event) error {
 		ok = ok || matches(evt)
 		return nil
-	})
+	}))
 	tp.assert.OK(ok, "event not found")
 }
 

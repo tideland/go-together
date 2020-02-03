@@ -35,8 +35,7 @@ func TestConditionBehavior(t *testing.T) {
 		return evt.Topic() == "end"
 	}
 	processor := func(emitter mesh.Emitter, evt *event.Event) error {
-		emitter.Broadcast(evt)
-		return nil
+		return emitter.Broadcast(evt)
 	}
 	plant := mesh.NewTestPlant(assert, behaviors.NewConditionBehavior("cb", tester, processor), 1)
 	defer plant.Stop()
