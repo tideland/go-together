@@ -32,19 +32,22 @@ type emitterStub struct {
 // Subscribers returns the IDs of the configured subscribers.
 func (es *emitterStub) Subscribers() []string {
 	var ids []string
-	for id := range es.tp.subscribers {
-		ids = append(ids, id)
+	for i := range es.tp.subscribers {
+		ids = append(ids, strconv.Itoa(i))
 	}
 	return ids
 }
 
 // Emit tries to emit the event to the subscriber with the given ID.
 func (es *emitterStub) Emit(id string, evt *event.Event) error {
-	bs, ok := es.tp.subscribers[id]
-	if !ok {
+	idx, err := strconv.Atoi(id)
+	if err != nil {
+		return err
+	}
+	if idx > len(es.tp.subscribers)+1 {
 		return errors.New("not found")
 	}
-	bs.Process(evt)
+	es.tp.subscribers[idx].Process(evt)
 	return nil
 }
 
@@ -63,13 +66,13 @@ func (es *emitterStub) Self(evt *event.Event) {
 
 // behaviorStub collects events for later tests.
 type behaviorStub struct {
-	id   string
-	evts []*event.Event
+	idx  int
+	sink *event.Sink
 }
 
 // ID returns the identificator of the simulated behavior.
 func (bs *behaviorStub) ID() string {
-	return bs.id
+	return strconv.Itoa(bs.idx)
 }
 
 // Init doesn't care for the passed emitter.
@@ -84,7 +87,7 @@ func (bs *behaviorStub) Terminate() error {
 
 // Process collects the received events.
 func (bs *behaviorStub) Process(evt *event.Event) {
-	bs.evts = append(bs.evts, evt)
+	_, _ = bs.sink.Push(evt)
 }
 
 // Recover is not called by testplant.
@@ -98,7 +101,9 @@ func (bs *behaviorStub) Recover(err interface{}) error {
 
 // TestPlant provides help to test behaviors. It is instantiated with an Asserts
 // instance, the behavior, and a wanted number of subscribers. Those do get the
-// IDs "sub-0" to "sub-*" and simply collect the events emitted by the behavior.
+// IDs "0" to "N" and simply collect the events emitted by the behavior for later
+// test processing.
+//
 // Then events can be emitted to the behavior so it can do its work. Afterwards
 // the AssertsXyz() methods can be used to test the collected events per subscriber.
 //
@@ -108,8 +113,8 @@ func (bs *behaviorStub) Recover(err interface{}) error {
 //     plant.Emit(event.New("foo"))
 //     plant.Emit(event.New("bar"))
 //
-//     plant.AssertLength("sub-0", 2)
-//     plant.AssertFind("sub-1", func(evt *event.Event) bool {
+//     plant.AssertLength(0, 2)
+//     plant.AssertFind(1, func(evt *event.Event) bool {
 //         return evt.Topic() == "bar"
 //     })
 //
@@ -118,22 +123,21 @@ type TestPlant struct {
 	mu          sync.Mutex
 	assert      *asserts.Asserts
 	behavior    Behavior
-	subscribers map[string]*behaviorStub
+	subscribers []*behaviorStub
 }
 
 // NewTestPlant creates a test plant for the given behavior and the configured
 // number of subscribers.
 func NewTestPlant(assert *asserts.Asserts, behavior Behavior, subscribers int) *TestPlant {
 	tp := &TestPlant{
-		assert:      assert,
-		behavior:    behavior,
-		subscribers: make(map[string]*behaviorStub),
+		assert:   assert,
+		behavior: behavior,
 	}
 	for i := 0; i < subscribers; i++ {
-		id := "sub-" + strconv.Itoa(i)
-		tp.subscribers[id] = &behaviorStub{
-			id: id,
-		}
+		tp.subscribers = append(tp.subscribers, &behaviorStub{
+			idx:  i,
+			sink: event.NewSink(256),
+		})
 	}
 	tp.assert.IncrCallstackOffset()
 	tp.assert.IncrCallstackOffset()
@@ -161,33 +165,54 @@ func (tp *TestPlant) Stop() {
 }
 
 // AssertLength tests the length of the collected events of a given subscriber.
-func (tp *TestPlant) AssertLength(id string, length int) {
-	subscriber, ok := tp.subscribers[id]
-	tp.assert.OK(ok, "subscriber not found:", id)
-	tp.assert.Length(subscriber.evts, length, "collected event length")
+func (tp *TestPlant) AssertLength(idx int, length int) {
+	tp.assert.OK(idx < len(tp.subscribers), "subscriber not found")
+	subscriber := tp.subscribers[idx]
+	tp.assert.Length(subscriber.sink, length, "collected event length")
 }
 
 // AssertAll tests if all collected events of a given subscriber fullfil
 // the given test function.
-func (tp *TestPlant) AssertAll(id string, test func(*event.Event) bool) {
-	subscriber, ok := tp.subscribers[id]
-	tp.assert.OK(ok, "subscriber not found:", id)
-	for i, evt := range subscriber.evts {
+func (tp *TestPlant) AssertAll(idx int, test func(*event.Event) bool) {
+	tp.assert.OK(idx < len(tp.subscribers), "subscriber not found")
+	subscriber := tp.subscribers[idx]
+	subscriber.sink.Do(func(i int, evt *event.Event) error {
 		tp.assert.OK(test(evt), "test failed at", strconv.Itoa(i))
-	}
+		return nil
+	})
 }
 
 // AssertFind tests if the collected events of a given subscriber contain
 // at least one matching the given find function.
-func (tp *TestPlant) AssertFind(id string, find func(*event.Event) bool) {
-	subscriber, ok := tp.subscribers[id]
-	tp.assert.OK(ok, "subscriber not found:", id)
-	for _, evt := range subscriber.evts {
-		if find(evt) {
-			return
-		}
-	}
-	tp.assert.OK(errors.New("event not found"))
+func (tp *TestPlant) AssertFind(idx int, matches func(*event.Event) bool) {
+	tp.assert.OK(idx < len(tp.subscribers), "subscriber not found")
+	subscriber := tp.subscribers[idx]
+	ok := false
+	subscriber.sink.Do(func(i int, evt *event.Event) error {
+		ok = ok || matches(evt)
+		return nil
+	})
+	tp.assert.OK(ok, "event not found")
+}
+
+// AssertFirst tests if the first of the collected events of a given subscriber
+// fullfils a given test function.
+func (tp *TestPlant) AssertFirst(idx int, test func(*event.Event) bool) {
+	tp.assert.OK(idx < len(tp.subscribers), "subscriber not found")
+	subscriber := tp.subscribers[idx]
+	evt, ok := subscriber.sink.PeekFirst()
+	tp.assert.OK(ok, "event not found")
+	tp.assert.OK(test(evt), "test failed")
+}
+
+// AssertLast tests if the last of the collected events of a given subscriber
+// fullfils a given test function.
+func (tp *TestPlant) AssertLast(idx int, test func(*event.Event) bool) {
+	tp.assert.OK(idx < len(tp.subscribers), "subscriber not found")
+	subscriber := tp.subscribers[idx]
+	evt, ok := subscriber.sink.PeekLast()
+	tp.assert.OK(ok, "event not found")
+	tp.assert.OK(test(evt), "test failed")
 }
 
 // EOF

@@ -37,7 +37,7 @@ func TestSimpleProcessorBehavior(t *testing.T) {
 	plant.Emit(event.New("bar"))
 	plant.Emit(event.New("baz"))
 
-	plant.AssertLength("sub-0", 3)
+	plant.AssertLength(0, 3)
 }
 
 // EOF

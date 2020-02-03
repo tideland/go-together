@@ -28,16 +28,16 @@ import (
 func TestCallbackBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	cbfA := func(emitter mesh.Emitter, evt *event.Event) error {
-		return emitter.Emit("sub-0", evt)
+		return emitter.Emit("0", evt)
 	}
 	cbfB := func(emitter mesh.Emitter, evt *event.Event) error {
-		return emitter.Emit("sub-1", evt)
+		return emitter.Emit("1", evt)
 	}
 	cbfC := func(emitter mesh.Emitter, evt *event.Event) error {
-		if err := emitter.Emit("sub-0", evt); err != nil {
+		if err := emitter.Emit("0", evt); err != nil {
 			return err
 		}
-		return emitter.Emit("sub-1", evt)
+		return emitter.Emit("1", evt)
 	}
 	plant := mesh.NewTestPlant(assert, behaviors.NewCallbackBehavior("cb", cbfA, cbfB, cbfC), 2)
 	defer plant.Stop()
@@ -46,8 +46,8 @@ func TestCallbackBehavior(t *testing.T) {
 	plant.Emit(event.New("bar"))
 	plant.Emit(event.New("baz"))
 
-	plant.AssertLength("sub-0", 6)
-	plant.AssertLength("sub-1", 6)
+	plant.AssertLength(0, 6)
+	plant.AssertLength(1, 6)
 }
 
 // EOF

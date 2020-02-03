@@ -39,7 +39,7 @@ func TestCountdownBehavior(t *testing.T) {
 		for i := 0; i < ct; i++ {
 			plant.Emit(event.New("count"))
 		}
-		plant.AssertFind("sub-0", func(evt *event.Event) bool {
+		plant.AssertFind(0, func(evt *event.Event) bool {
 			return evt.Topic() == "zero" && evt.Payload().At("after").AsInt(-1) == ct
 		})
 	}

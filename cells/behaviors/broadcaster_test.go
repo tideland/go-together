@@ -34,8 +34,8 @@ func TestBroadcasterBehavior(t *testing.T) {
 	plant.Emit(event.New("b"))
 	plant.Emit(event.New("c"))
 
-	for _, id := range []string{"sub-0", "sub-1", "sub-2", "sub-3", "sub-4"} {
-		plant.AssertLength(id, 3)
+	for idx := 0; idx < 5; idx++ {
+		plant.AssertLength(idx, 3)
 	}
 }
 

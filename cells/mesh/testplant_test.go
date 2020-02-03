@@ -41,14 +41,14 @@ func TestSubscribingTestPlant(t *testing.T) {
 	plant.Emit(event.New("set", "a", 1))
 	plant.Emit(event.New("set", "b", 2))
 	plant.Emit(event.New("length"))
-	plant.Emit(event.New("emit", "to", "sub-1", "value", 12345))
+	plant.Emit(event.New("emit", "to", "1", "value", 12345))
 
-	plant.AssertLength("sub-0", 1)
-	plant.AssertLength("sub-1", 2)
-	plant.AssertAll("sub-0", func(evt *event.Event) bool {
+	plant.AssertLength(0, 1)
+	plant.AssertLength(1, 2)
+	plant.AssertAll(0, func(evt *event.Event) bool {
 		return evt.Topic() == "set" && evt.Payload().At("length").AsInt(-1) == 2
 	})
-	plant.AssertFind("sub-1", func(evt *event.Event) bool {
+	plant.AssertFind(1, func(evt *event.Event) bool {
 		return evt.Topic() == "set" && evt.Payload().At("value").AsInt(-1) == 12345
 	})
 }

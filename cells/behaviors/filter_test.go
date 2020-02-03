@@ -44,7 +44,7 @@ func TestFilterBehavior(t *testing.T) {
 	for _, d := range data {
 		plant.Emit(event.New(d[0], "test", d[1]))
 	}
-	plant.AssertLength("sub-0", 2)
+	plant.AssertLength(0, 2)
 	plant.Stop()
 
 	plant = mesh.NewTestPlant(assert, behaviors.NewExcludeFilterBehavior("efb", filter), 1)
@@ -59,7 +59,7 @@ func TestFilterBehavior(t *testing.T) {
 	for _, d := range data {
 		plant.Emit(event.New(d[0], "test", d[1]))
 	}
-	plant.AssertLength("sub-0", 4)
+	plant.AssertLength(0, 4)
 	plant.Stop()
 }
 

@@ -49,10 +49,10 @@ func TestPairBehavior(t *testing.T) {
 		plant.Emit(event.New("visitor", "name", name))
 	}
 
-	plant.AssertFind("sub-0", func(evt *event.Event) bool {
+	plant.AssertFind(0, func(evt *event.Event) bool {
 		return evt.Topic() == behaviors.TopicPair
 	})
-	plant.AssertFind("sub-0", func(evt *event.Event) bool {
+	plant.AssertFind(0, func(evt *event.Event) bool {
 		return evt.Topic() == behaviors.TopicPairTimeout
 	})
 }

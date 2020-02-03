@@ -37,8 +37,8 @@ func TestOnceBehavior(t *testing.T) {
 	plant.Emit(event.New("bar"))
 	plant.Emit(event.New("baz"))
 
-	plant.AssertLength("sub-0", 1)
-	plant.AssertAll("sub-0", func(evt *event.Event) bool {
+	plant.AssertLength(0, 1)
+	plant.AssertAll(0, func(evt *event.Event) bool {
 		return evt.Topic() == "foo"
 	})
 }

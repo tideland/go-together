@@ -40,7 +40,7 @@ func TestEvaluatorBehavior(t *testing.T) {
 	for _, topic := range topics {
 		plant.Emit(event.New(topic))
 	}
-	plant.AssertFind("sub-0", func(evt *event.Event) bool {
+	plant.AssertFind(0, func(evt *event.Event) bool {
 		return evt.Topic() == behaviors.TopicEvaluation &&
 			evt.Payload().At("count").AsInt(0) == 10 &&
 			evt.Payload().At("min-rating").AsFloat64(0.0) == 1.0 &&
@@ -53,7 +53,7 @@ func TestEvaluatorBehavior(t *testing.T) {
 	plant.Emit(event.New(event.TopicReset))
 	plant.Emit(event.New("1234"))
 
-	plant.AssertFind("sub-0", func(evt *event.Event) bool {
+	plant.AssertFind(0, func(evt *event.Event) bool {
 		return evt.Topic() == behaviors.TopicEvaluation &&
 			evt.Payload().At("count").AsInt(0) == 1 &&
 			evt.Payload().At("min-rating").AsFloat64(0.0) == 1234.0 &&
@@ -69,7 +69,7 @@ func TestEvaluatorBehavior(t *testing.T) {
 		plant.Emit(event.New(topic))
 	}
 
-	plant.AssertFind("sub-0", func(evt *event.Event) bool {
+	plant.AssertFind(0, func(evt *event.Event) bool {
 		return evt.Topic() == behaviors.TopicEvaluation &&
 			evt.Payload().At("count").AsInt(0) == 5 &&
 			evt.Payload().At("min-rating").AsFloat64(0.0) == 1.0 &&
@@ -96,7 +96,7 @@ func TestMovingEvaluatorBehavior(t *testing.T) {
 		plant.Emit(event.New(topic))
 	}
 
-	plant.AssertFind("sub-0", func(evt *event.Event) bool {
+	plant.AssertFind(0, func(evt *event.Event) bool {
 		return evt.Topic() == behaviors.TopicEvaluation &&
 			evt.Payload().At("count").AsInt(0) == 5 &&
 			evt.Payload().At("min-rating").AsFloat64(0.0) == 1.0 &&

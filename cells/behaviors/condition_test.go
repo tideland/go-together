@@ -13,7 +13,6 @@ package behaviors_test // import "tideland.dev/go/together/cells/behaviors"
 
 import (
 	"testing"
-	"time"
 
 	"tideland.dev/go/audit/asserts"
 	"tideland.dev/go/audit/generators"
@@ -31,28 +30,25 @@ func TestConditionBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	generator := generators.New(generators.FixedRand())
 	size := 1000
-	sigc := asserts.MakeMultiWaitChan(size)
-	msh := mesh.New()
-	defer assert.NoError(msh.Stop())
-
+	topics := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "end"}
 	tester := func(evt *event.Event) bool {
 		return evt.Topic() == "end"
 	}
 	processor := func(emitter mesh.Emitter, evt *event.Event) error {
-		sigc <- evt.Topic()
+		emitter.Broadcast(evt)
 		return nil
 	}
-
-	assert.NoError(msh.SpawnCells(behaviors.NewConditionBehavior("condition", tester, processor)))
-
-	topics := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "end"}
+	plant := mesh.NewTestPlant(assert, behaviors.NewConditionBehavior("cb", tester, processor), 1)
+	defer plant.Stop()
 
 	for i := 0; i < size; i++ {
 		topic := generator.OneStringOf(topics...)
-		assert.NoError(msh.Emit("condition", event.New(topic)))
+		plant.Emit(event.New(topic))
 	}
 
-	assert.Wait(sigc, "end", time.Second)
+	plant.AssertAll(0, func(evt *event.Event) bool {
+		return evt.Topic() == "end"
+	})
 }
 
 // EOF

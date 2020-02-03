@@ -40,7 +40,7 @@ func TestRateBehavior(t *testing.T) {
 		topic := generator.OneStringOf(topics...)
 		plant.Emit(event.New(topic))
 	}
-	plant.AssertAll("sub-0", func(evt *event.Event) bool {
+	plant.AssertAll(0, func(evt *event.Event) bool {
 		return evt.Topic() == behaviors.TopicRate
 	})
 }
