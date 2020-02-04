@@ -159,7 +159,14 @@ func (tp *TestPlant) Emit(evt *event.Event) {
 	tp.behavior.Process(evt)
 }
 
-// Stop terminates the behavior.
+// Reset clears all collected subscriber events.
+func (tp *TestPlant) Reset() {
+	for _, subscriber := range tp.subscribers {
+		tp.assert.OK(subscriber.sink.Clear())
+	}
+}
+
+// Stop terminates the behavior and tests its return value.
 func (tp *TestPlant) Stop() {
 	tp.assert.OK(tp.behavior.Terminate())
 }
@@ -183,16 +190,29 @@ func (tp *TestPlant) AssertAll(idx int, test func(*event.Event) bool) {
 }
 
 // AssertFind tests if the collected events of a given subscriber contain
-// at least one matching the given find function.
+// at least one matching the given match function.
 func (tp *TestPlant) AssertFind(idx int, matches func(*event.Event) bool) {
 	tp.assert.OK(idx < len(tp.subscribers), "subscriber not found")
 	subscriber := tp.subscribers[idx]
-	ok := false
+	found := false
 	tp.assert.OK(subscriber.sink.Do(func(i int, evt *event.Event) error {
-		ok = ok || matches(evt)
+		found = found || matches(evt)
 		return nil
 	}))
-	tp.assert.OK(ok, "event not found")
+	tp.assert.OK(found, "event not found")
+}
+
+// AssertNone tests if the collected events of a given subscriber contain
+// no one matching the given match function.
+func (tp *TestPlant) AssertNone(idx int, matches func(*event.Event) bool) {
+	tp.assert.OK(idx < len(tp.subscribers), "subscriber not found")
+	subscriber := tp.subscribers[idx]
+	found := false
+	tp.assert.OK(subscriber.sink.Do(func(i int, evt *event.Event) error {
+		found = found || matches(evt)
+		return nil
+	}))
+	tp.assert.False(found, "event found")
 }
 
 // AssertFirst tests if the first of the collected events of a given subscriber

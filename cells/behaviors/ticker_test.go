@@ -17,7 +17,6 @@ import (
 
 	"tideland.dev/go/audit/asserts"
 	"tideland.dev/go/together/cells/behaviors"
-	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
 )
 
@@ -28,25 +27,12 @@ import (
 // TestTickerBehavior tests the ticker behavior.
 func TestTickerBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	sigc := asserts.MakeWaitChan()
-	msh := mesh.New()
-
-	processor := func(accessor event.SinkAccessor) (*event.Payload, error) {
-		sigc <- accessor.Len()
-		return nil, nil
-	}
-
-	assert.OK(msh.SpawnCells(
-		behaviors.NewTickerBehavior("ticker", 50*time.Millisecond),
-		behaviors.NewCollectorBehavior("collector", 10, processor),
-	))
-	assert.OK(msh.Subscribe("ticker", "collector"))
+	plant := mesh.NewTestPlant(assert, behaviors.NewTickerBehavior("ticker", 50*time.Millisecond), 1)
+	defer plant.Stop()
 
 	time.Sleep(125 * time.Millisecond)
 
-	assert.OK(msh.Emit("collector", event.New(event.TopicProcess)))
-	assert.Wait(sigc, 2, time.Minute)
-	assert.OK(msh.Stop())
+	plant.AssertLength(0, 2)
 }
 
 // EOF

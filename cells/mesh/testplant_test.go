@@ -51,6 +51,19 @@ func TestSubscribingTestPlant(t *testing.T) {
 	plant.AssertFind(1, func(evt *event.Event) bool {
 		return evt.Topic() == "set" && evt.Payload().At("value").AsInt(-1) == 12345
 	})
+	plant.AssertFirst(1, func(evt *event.Event) bool {
+		return evt.Payload().At("length").AsInt(-1) == 2
+	})
+	plant.AssertLast(1, func(evt *event.Event) bool {
+		return evt.Payload().At("value").AsInt(-1) == 12345
+	})
+	plant.AssertNone(1, func(evt *event.Event) bool {
+		return evt.Topic() == "not here"
+	})
+
+	plant.Reset()
+	plant.AssertLength(0, 0)
+	plant.AssertLength(1, 0)
 }
 
 // EOF

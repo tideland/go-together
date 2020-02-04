@@ -12,7 +12,6 @@ package behaviors_test // import "tideland.dev/go/together/cells/behaviors"
 //--------------------
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -30,50 +29,45 @@ import (
 // TestRateWindowBehavior tests the event rate window behavior.
 func TestRateWindowBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	sigc := asserts.MakeWaitChan()
 	generator := generators.New(generators.FixedRand())
-	msh := mesh.New()
-
 	topics := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "bang"}
-	duration := 50 * time.Millisecond
 	matcher := func(evt *event.Event) (bool, error) {
-		match := evt.Topic() == "bang"
-		return match, nil
+		// Signal when topic is "bang".
+		return evt.Topic() == "bang", nil
 	}
+	duration := 50 * time.Millisecond
 	processor := func(accessor event.SinkAccessor) (*event.Payload, error) {
+		// Got signals with matching rate, return info about it.
 		first, _ := accessor.PeekFirst()
 		last, _ := accessor.PeekLast()
 		difference := last.Timestamp().Sub(first.Timestamp())
 		return event.NewPayload("difference", difference), nil
 	}
-	oncer := func(emitter mesh.Emitter, evt *event.Event) error {
-		difference := evt.Payload().At("difference").AsDuration(0)
-		assert.OK(difference < duration)
-		assert.Equal(evt.Topic(), behaviors.TopicRateWindow)
-		sigc <- difference
-		return nil
-	}
-
-	assert.OK(msh.SpawnCells(
-		behaviors.NewRateWindowBehavior("windower", matcher, 5, duration, processor),
-		behaviors.NewOnceBehavior("oncer", oncer),
-	))
-	assert.OK(msh.Subscribe("windower", "oncer"))
+	plant := mesh.NewTestPlant(assert, behaviors.NewRateWindowBehavior("rwb", matcher, 5, duration, processor), 1)
+	defer plant.Stop()
 
 	for i := 0; i < 250; i++ {
 		topic := generator.OneStringOf(topics...)
-		assert.OK(msh.Emit("windower", event.New(topic)))
+		plant.Emit(event.New(topic))
 		time.Sleep(time.Millisecond)
 	}
 
-	assert.WaitTested(sigc, func(v interface{}) error {
-		difference := v.(time.Duration)
-		if difference > 50*time.Millisecond {
-			return fmt.Errorf("diff %v", difference)
-		}
-		return nil
-	}, 5*time.Second)
-	assert.OK(msh.Stop())
+	plant.AssertAll(0, func(evt *event.Event) bool {
+		return evt.Topic() == behaviors.TopicRateWindow && evt.Payload().At("difference").AsDuration(2*duration) <= duration
+	})
+
+	plant.Reset()
+	plant.Emit(event.New(event.TopicReset))
+
+	for i := 0; i < 5; i++ {
+		topic := generator.OneStringOf(topics...)
+		plant.Emit(event.New(topic))
+		time.Sleep(duration)
+	}
+
+	plant.AssertNone(0, func(evt *event.Event) bool {
+		return evt.Topic() == behaviors.TopicRateWindow
+	})
 }
 
 // EOF

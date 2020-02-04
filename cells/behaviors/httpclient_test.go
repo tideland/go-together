@@ -15,7 +15,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
-	"time"
 
 	"tideland.dev/go/audit/asserts"
 	"tideland.dev/go/audit/environments"
@@ -33,57 +32,34 @@ import (
 func TestHTTPClientBehaviorGet(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	wa := initWebAsserter(assert)
-	sigc := asserts.MakeWaitChan()
-	msh := mesh.New()
+	plant := mesh.NewTestPlant(assert, behaviors.NewHTTPClientBehavior("cb"), 1)
+	defer plant.Stop()
 
-	trigger := func(emitter mesh.Emitter, evt *event.Event) error {
-		if evt.Payload().At("id").AsString("<unknown>") == "nested" {
-			assert.OK(emitter.Broadcast(event.New(event.TopicProcess)))
-		}
-		return nil
-	}
-	processor := func(accessor event.SinkAccessor) (*event.Payload, error) {
-		assert.OK(accessor.Do(func(index int, evt *event.Event) error {
-			assert.Equal(evt.Topic(), behaviors.TopicHTTPGetReply)
-			assert.Equal(evt.Payload().At("status-code").AsInt(0), 200)
-			switch evt.Payload().At("id").AsString("-") {
-			case "simple":
-				data := evt.Payload().At("data").AsString("-")
-				assert.Equal(data, "Done!")
-			case "nested":
-				data := evt.Payload().At("data").AsPayload()
-				assert.Length(data, 3)
-				assert.Equal(data.At("A").AsString("-"), "Foo")
-				assert.Equal(data.At("B").AsInt(0), 1234)
-				assert.Equal(data.At("C", "0", "E").AsString("-"), "Bar")
-				assert.Equal(data.At("C", "0", "F").AsBool(false), true)
-				assert.Equal(data.At("C", "0", "G").AsInt(0), 10)
-				assert.Equal(data.At("C", "1", "E").AsString("-"), "Baz")
-				assert.Equal(data.At("C", "1", "F").AsBool(true), false)
-				assert.Equal(data.At("C", "1", "G").AsInt(0), 20)
-				assert.Equal(data.At("C", "2", "E").AsString("-"), "Yadda")
-				assert.Equal(data.At("C", "2", "F").AsBool(false), true)
-				assert.Equal(data.At("C", "2", "G").AsInt(0), 30)
-			}
-			return nil
-		}))
-		sigc <- accessor.Len()
-		return nil, nil
-	}
+	plant.Emit(event.New(behaviors.TopicHTTPGet, "id", "simple", "url", wa.URL()+"/simple"))
+	plant.Emit(event.New(behaviors.TopicHTTPGet, "id", "nested", "url", wa.URL()+"/nested"))
 
-	assert.OK(msh.SpawnCells(
-		behaviors.NewHTTPClientBehavior("client"),
-		behaviors.NewSimpleProcessorBehavior("trigger", trigger),
-		behaviors.NewCollectorBehavior("collector", 10, processor),
-	))
-	assert.OK(msh.Subscribe("client", "collector", "trigger"))
-	assert.OK(msh.Subscribe("trigger", "collector"))
+	plant.AssertFirst(0, func(evt *event.Event) bool {
+		return evt.Topic() == behaviors.TopicHTTPGetReply &&
+			evt.Payload().At("status-code").AsInt(0) == 200 &&
+			evt.Payload().At("data").AsString("-") == "Done!"
+	})
+	plant.AssertLast(0, func(evt *event.Event) bool {
+		data := evt.Payload().At("data").AsPayload()
+		return evt.Topic() == behaviors.TopicHTTPGetReply &&
+			evt.Payload().At("status-code").AsInt(0) == 200 &&
+			data.At("A").AsString("-") == "Foo" &&
+			data.At("B").AsInt(0) == 1234 &&
+			data.At("C", "0", "E").AsString("-") == "Bar"
+	})
 
-	assert.OK(msh.Emit("client", event.New(behaviors.TopicHTTPGet, "id", "simple", "url", wa.URL()+"/simple")))
-	assert.OK(msh.Emit("client", event.New(behaviors.TopicHTTPGet, "id", "nested", "url", wa.URL()+"/nested")))
-
-	assert.Wait(sigc, 2, time.Second)
-	assert.OK(msh.Stop())
+	// assert.Equal(data.At("C", "0", "F").AsBool(false), true)
+	// assert.Equal(data.At("C", "0", "G").AsInt(0), 10)
+	// assert.Equal(data.At("C", "1", "E").AsString("-"), "Baz")
+	// assert.Equal(data.At("C", "1", "F").AsBool(true), false)
+	// assert.Equal(data.At("C", "1", "G").AsInt(0), 20)
+	// assert.Equal(data.At("C", "2", "E").AsString("-"), "Yadda")
+	// assert.Equal(data.At("C", "2", "F").AsBool(false), true)
+	// assert.Equal(data.At("C", "2", "G").AsInt(0), 30)
 }
 
 //--------------------
