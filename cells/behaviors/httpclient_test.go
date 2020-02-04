@@ -51,12 +51,12 @@ func TestHTTPClientBehaviorGet(t *testing.T) {
 			data.At("B").AsInt(0) == 1234 &&
 			data.At("C", "0", "E").AsString("-") == "Bar" &&
 			data.At("C", "0", "F").AsBool(false) &&
-			data.At("C", "0", "G").AsInt(0) == 10
+			data.At("C", "0", "G").AsInt(0) == 10 &&
+			data.At("C", "1", "E").AsString("-") == "Baz" &&
+			!data.At("C", "1", "F").AsBool(true) &&
+			data.At("C", "1", "G").AsInt(0) == 20
 	})
 
-	// assert.Equal(data.At("C", "1", "E").AsString("-"), "Baz")
-	// assert.Equal(data.At("C", "1", "F").AsBool(true), false)
-	// assert.Equal(data.At("C", "1", "G").AsInt(0), 20)
 	// assert.Equal(data.At("C", "2", "E").AsString("-"), "Yadda")
 	// assert.Equal(data.At("C", "2", "F").AsBool(false), true)
 	// assert.Equal(data.At("C", "2", "G").AsInt(0), 30)
