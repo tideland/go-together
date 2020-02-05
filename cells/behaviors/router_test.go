@@ -14,7 +14,6 @@ package behaviors_test // import "tideland.dev/go/together/cells/behaviors"
 import (
 	"strings"
 	"testing"
-	"time"
 
 	"tideland.dev/go/audit/asserts"
 	"tideland.dev/go/together/cells/behaviors"
@@ -29,46 +28,23 @@ import (
 // TestRouterBehavior tests the router behavior.
 func TestRouterBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	sigc := asserts.MakeWaitChan()
-	msh := mesh.New()
-
 	router := func(evt *event.Event) []string {
+		// Topic does not interest in this case.
 		return strings.Split(evt.Payload().At("ids").AsString(""), "/")
 	}
-	processor := func(accessor event.SinkAccessor) (*event.Payload, error) {
-		sigc <- accessor.Len()
-		return nil, nil
-	}
+	plant := mesh.NewTestPlant(assert, behaviors.NewRouterBehavior("rb", router), 5)
+	defer plant.Stop()
 
-	assert.OK(msh.SpawnCells(
-		behaviors.NewRouterBehavior("router", router),
-		behaviors.NewCollectorBehavior("test-1", 10, processor),
-		behaviors.NewCollectorBehavior("test-2", 10, processor),
-		behaviors.NewCollectorBehavior("test-3", 10, processor),
-		behaviors.NewCollectorBehavior("test-4", 10, processor),
-		behaviors.NewCollectorBehavior("test-5", 10, processor),
-	))
-	assert.OK(msh.Subscribe("router", "test-1", "test-2", "test-3", "test-4", "test-5"))
+	plant.Emit(event.New("route-it", "ids", "0/1"))
+	plant.Emit(event.New("route-it", "ids", "0/1/2"))
+	plant.Emit(event.New("route-it", "ids", "2/3/4"))
+	plant.Emit(event.New("route-it", "ids", "unknown"))
 
-	assert.OK(msh.Emit("router", event.New("route-it", "ids", "test-1/test-2")))
-	assert.OK(msh.Emit("router", event.New("route-it", "ids", "test-1/test-2/test-3")))
-	assert.OK(msh.Emit("router", event.New("route-it", "ids", "test-3/test-4/test-5")))
-	assert.OK(msh.Emit("router", event.New("route-it", "ids", "unknown")))
-
-	time.Sleep(100 * time.Millisecond)
-
-	test := func(id string, l int) {
-		assert.OK(msh.Emit(id, event.New(event.TopicProcess)))
-		assert.Wait(sigc, l, time.Second)
-	}
-
-	test("test-1", 2)
-	test("test-2", 2)
-	test("test-3", 2)
-	test("test-4", 1)
-	test("test-5", 1)
-
-	assert.OK(msh.Stop())
+	plant.AssertLength(0, 2)
+	plant.AssertLength(1, 2)
+	plant.AssertLength(2, 2)
+	plant.AssertLength(3, 1)
+	plant.AssertLength(4, 1)
 }
 
 // EOF
