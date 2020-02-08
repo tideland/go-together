@@ -13,6 +13,7 @@ package event // import "tideland.dev/go/together/cells/event"
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -88,6 +89,11 @@ func (e *Event) Topic() string {
 // Payload returns the event payload.
 func (e *Event) Payload() *Payload {
 	return e.payload
+}
+
+// String implements fmt.Stringer.
+func (e *Event) String() string {
+	return fmt.Sprintf("Event{Topic: %v, Payload: %v}", e.topic, e.payload)
 }
 
 // EOF
