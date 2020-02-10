@@ -13,7 +13,6 @@ package behaviors_test // import "tideland.dev/go/together/cells/behaviors"
 
 import (
 	"testing"
-	"time"
 
 	"tideland.dev/go/audit/asserts"
 	"tideland.dev/go/together/cells/behaviors"
@@ -28,36 +27,34 @@ import (
 // TestCounterBehavior tests the counting of events.
 func TestCounterBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	sigc := asserts.MakeWaitChan()
-	msh := mesh.New()
-	defer assert.NoError(msh.Stop())
-
 	counters := func(evt *event.Event) []string {
 		return evt.Payload().Keys()
 	}
-	tester := func(evt *event.Event) bool {
-		a := evt.Payload().At("a").AsInt(0)
-		b := evt.Payload().At("b").AsInt(0)
-		c := evt.Payload().At("c").AsInt(0)
-		d := evt.Payload().At("d").AsInt(0)
-		return a == 3 && b == 1 && c == 1 && d == 2
-	}
-	processor := func(emitter mesh.Emitter, evt *event.Event) error {
-		sigc <- true
-		return nil
-	}
+	plant := mesh.NewTestPlant(assert, behaviors.NewCounterBehavior("cb", counters), 1)
+	defer plant.Stop()
 
-	assert.NoError(msh.SpawnCells(
-		behaviors.NewCounterBehavior("counter", counters),
-		behaviors.NewConditionBehavior("conditioner", tester, processor),
-	))
-	assert.NoError(msh.Subscribe("counter", "conditioner"))
+	plant.Emit(event.New("count", "a", 1, "b", 1))
+	plant.Emit(event.New("count", "a", 1, "c", 1, "d", 1))
+	plant.Emit(event.New("count", "a", 1, "d", 1))
 
-	assert.NoError(msh.Emit("counter", event.New("count", "a", 1, "b", 1)))
-	assert.NoError(msh.Emit("counter", event.New("count", "a", 1, "c", 1, "d", 1)))
-	assert.NoError(msh.Emit("counter", event.New("count", "a", 1, "d", 1)))
+	plant.AssertLength(0, 3)
+	plant.AssertLast(0, func(evt *event.Event) bool {
+		return evt.Topic() == event.TopicCounted &&
+			evt.Payload().At("a").AsInt(-1) == 3 &&
+			evt.Payload().At("b").AsInt(-1) == 1 &&
+			evt.Payload().At("c").AsInt(-1) == 1 &&
+			evt.Payload().At("d").AsInt(-1) == 2
+	})
 
-	assert.Wait(sigc, true, time.Second)
+	plant.Reset()
+	plant.Emit(event.New(event.TopicReset))
+	plant.Emit(event.New("count", "z", "don't care"))
+
+	plant.AssertLast(0, func(evt *event.Event) bool {
+		return evt.Topic() == event.TopicCounted &&
+			evt.Payload().At("a").AsInt(-1) == -1 &&
+			evt.Payload().At("z").AsInt(-1) == 1
+	})
 }
 
 // EOF

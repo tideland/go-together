@@ -28,41 +28,39 @@ import (
 //--------------------
 
 // TestAggregatorBehavior tests the aggregator behavior. Scenario
-// is simply to count the lengths of the random topic until it
-// reached the value 100.
+// is simply to concatenate the random topics to the passed in topics in
+// the payload at "topic".
 func TestAggregatorBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	generator := generators.New(generators.FixedRand())
-	msh := mesh.New()
-	defer assert.NoError(msh.Stop())
-
+	count := 50
 	aggregate := func(pl *event.Payload, evt *event.Event) (*event.Payload, error) {
 		topic := evt.Topic()
 		topics := pl.At("topics").AsString("")
 		topics += "/" + topic
 		return event.NewPayload("topics", topics), nil
 	}
+	plant := mesh.NewTestPlant(assert, behaviors.NewAggregatorBehavior("ab", event.NewPayload(), aggregate), 1)
+	defer plant.Stop()
 
-	assert.NoError(msh.SpawnCells(behaviors.NewAggregatorBehavior("aggregator", event.NewPayload(), aggregate)))
-
-	for i := 0; i < 50; i++ {
+	for i := 0; i < count; i++ {
 		topic := generator.Word()
-		assert.NoError(msh.Emit("aggregator", event.New(topic)))
+		plant.Emit(event.New(topic))
 	}
 
 	pl, plc := event.NewReplyPayload()
-	evt := event.New(event.TopicStatus, pl)
-
-	assert.NoError(msh.Emit("aggregator", evt))
+	plant.Emit(event.New(event.TopicStatus, pl))
 
 	select {
 	case pl := <-plc:
 		topics := pl.At("topics").AsString("")
 		splitted := strings.Split(topics, "/")
-		assert.Length(splitted, 51)
+		assert.Length(splitted, count+1)
 	case <-time.After(5 * time.Second):
 		assert.Fail("timeout")
 	}
+
+	plant.AssertLength(0, count)
 }
 
 // EOF
