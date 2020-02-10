@@ -13,7 +13,6 @@ package behaviors_test // import "tideland.dev/go/together/cells/behaviors"
 
 import (
 	"testing"
-	"time"
 
 	"tideland.dev/go/audit/asserts"
 	"tideland.dev/go/audit/generators"
@@ -30,10 +29,7 @@ import (
 func TestTopicPayloadsBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	generator := generators.New(generators.FixedRand())
-	sigc := asserts.MakeWaitChan()
-	msh := mesh.New()
-
-	tpProcessor := func(topic string, pls []*event.Payload) (*event.Payload, error) {
+	processor := func(topic string, pls []*event.Payload) (*event.Payload, error) {
 		total := 0
 		for _, pl := range pls {
 			value := pl.At("value").AsInt(0)
@@ -41,21 +37,8 @@ func TestTopicPayloadsBehavior(t *testing.T) {
 		}
 		return event.NewPayload("total", total), nil
 	}
-	cProcessor := func(accessor event.SinkAccessor) (*event.Payload, error) {
-		err := accessor.Do(func(index int, evt *event.Event) error {
-			total := evt.Payload().At("total").AsInt(0)
-			assert.Range(total, 1, 25)
-			return nil
-		})
-		sigc <- true
-		return nil, err
-	}
-
-	assert.OK(msh.SpawnCells(
-		behaviors.NewTopicPayloadsBehavior("topic-payloads", 5, tpProcessor),
-		behaviors.NewCollectorBehavior("collector", 10, cProcessor),
-	))
-	assert.OK(msh.Subscribe("topic-payloads", "collector"))
+	plant := mesh.NewTestPlant(assert, behaviors.NewTopicPayloadsBehavior("tpp", 5, processor), 1)
+	defer plant.Stop()
 
 	topics := []string{"alpha", "beta", "gamma"}
 	values := []int{1, 2, 3, 4, 5}
@@ -63,12 +46,16 @@ func TestTopicPayloadsBehavior(t *testing.T) {
 	for i := 0; i < 50; i++ {
 		topic := generator.OneStringOf(topics...)
 		value := generator.OneIntOf(values...)
-		assert.OK(msh.Emit("topic-payloads", event.New(topic, "value", value)))
+		plant.Emit(event.New(topic, "value", value))
 	}
 
-	assert.OK(msh.Emit("collector", event.New(event.TopicProcess)))
-	assert.Wait(sigc, true, 5*time.Second)
-	assert.OK(msh.Stop())
+	plant.AssertAll(0, func(evt *event.Event) bool {
+		topic := evt.Topic()
+		topicOK := topic == "alpha" || topic == "beta" || topic == "gamma"
+		total := evt.Payload().At("total").AsInt(-1)
+		totalOK := total >= 1 && total <= 250
+		return topicOK && totalOK
+	})
 }
 
 // EOF
