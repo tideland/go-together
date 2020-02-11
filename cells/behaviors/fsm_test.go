@@ -14,7 +14,6 @@ package behaviors_test // import "tideland.dev/go/together/cells/behaviors"
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"tideland.dev/go/audit/asserts"
 	"tideland.dev/go/together/cells/behaviors"
@@ -29,82 +28,57 @@ import (
 // TestFSMBehavior tests the finite state machine behavior.
 func TestFSMBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	sigc := asserts.MakeWaitChan()
-	msh := mesh.New()
-
-	processor := func(accessor event.SinkAccessor) (*event.Payload, error) {
-		eventInfos := []string{}
-		assert.OK(accessor.Do(func(index int, evt *event.Event) error {
-			eventInfos = append(eventInfos, evt.Topic())
-			return nil
-		}))
-		sigc <- eventInfos
-		return nil, nil
-	}
-
-	lockA := lockMachine{"a", 0}
-	lockB := lockMachine{"b", 0}
-
-	assert.OK(msh.SpawnCells(
-		behaviors.NewFSMBehavior("lock-a", behaviors.FSMStatus{"locked", lockA.Locked, nil}),
-		behaviors.NewFSMBehavior("lock-b", behaviors.FSMStatus{"locked", lockB.Locked, nil}),
-		newRestorerBehavior("restorer"),
-		behaviors.NewCollectorBehavior("collector-a", 10, processor),
-		behaviors.NewCollectorBehavior("collector-b", 10, processor),
-	))
-	assert.OK(msh.Subscribe("lock-a", "restorer", "collector-a"))
-	assert.OK(msh.Subscribe("lock-b", "restorer", "collector-b"))
+	lock := lockMachine{"one", 0}
+	plant := mesh.NewTestPlant(assert, behaviors.NewFSMBehavior("fsmb", behaviors.FSMStatus{"locked", lock.Locked, nil}), 1)
+	defer plant.Stop()
 
 	// 1st run: emit not enough and press button.
-	assert.OK(msh.Emit("lock-a", event.New("coin", "cents", 20)))
-	assert.OK(msh.Emit("lock-a", event.New("coin", "cents", 20)))
-	assert.OK(msh.Emit("lock-a", event.New("coin", "cents", 20)))
-	assert.OK(msh.Emit("lock-a", event.New("info")))
-	assert.OK(msh.Emit("lock-a", event.New("press-button")))
-	assert.OK(msh.Emit("lock-a", event.New("check-cents")))
-	assert.OK(msh.Emit("restorer", event.New("grab")))
+	plant.Emit(event.New("coin", "cents", 20))
+	plant.Emit(event.New("coin", "cents", 20))
+	plant.Emit(event.New("coin", "cents", 20))
+	plant.Emit(event.New("info"))
+	plant.Emit(event.New("press-button"))
+	plant.Emit(event.New("check-cents"))
 
-	time.Sleep(100 * time.Millisecond)
-
-	assert.OK(msh.Emit("collector-a", event.New(event.TopicProcess)))
-	assert.OK(msh.Emit("collector-a", event.New(event.TopicReset)))
-
-	assert.Wait(sigc, []string{"status", "coins-dropped", "cents-checked"}, time.Second)
+	plant.AssertFind(0, func(evt *event.Event) bool {
+		return evt.Topic() == "status" &&
+			evt.Payload().At("status").AsString("-") == "locked" &&
+			evt.Payload().At("cents").AsInt(-1) == 60
+	})
+	plant.AssertLast(0, func(evt *event.Event) bool {
+		return evt.Topic() == "cents-checked" && evt.Payload().At("cents").AsInt(-1) == 0
+	})
+	plant.Reset()
 
 	// 2nd run: unlock the lock and lock it again.
-	assert.OK(msh.Emit("lock-a", event.New("coin", "cents", 50)))
-	assert.OK(msh.Emit("lock-a", event.New("coin", "cents", 20)))
-	assert.OK(msh.Emit("lock-a", event.New("coin", "cents", 50)))
-	assert.OK(msh.Emit("lock-a", event.New("info")))
-	assert.OK(msh.Emit("lock-a", event.New("press-button")))
+	plant.Emit(event.New("coin", "cents", 50))
+	plant.Emit(event.New("coin", "cents", 20))
+	plant.Emit(event.New("coin", "cents", 50))
+	plant.Emit(event.New("info"))
+	plant.Emit(event.New("press-button"))
 
-	time.Sleep(100 * time.Millisecond)
-
-	assert.OK(msh.Emit("collector-a", event.New(event.TopicProcess)))
-	assert.OK(msh.Emit("collector-a", event.New(event.TopicReset)))
-
-	assert.Wait(sigc, []string{"unlocked", "status", "coins-dropped"}, time.Second)
+	plant.AssertFind(0, func(evt *event.Event) bool {
+		return evt.Topic() == "unlocked"
+	})
+	plant.AssertLast(0, func(evt *event.Event) bool {
+		return evt.Topic() == "coins-dropped" && evt.Payload().At("cents").AsInt(-1) == 20
+	})
+	plant.Reset()
 
 	// 3rd run: put a plastic chip in the lock.
-	assert.OK(msh.Emit("lock-a", event.New("plastic-chip")))
+	plant.Emit(event.New("plastic-chip"))
 
-	time.Sleep(100 * time.Millisecond)
-
-	assert.OK(msh.Emit("collector-a", event.New(event.TopicProcess)))
-	assert.OK(msh.Emit("collector-a", event.New(event.TopicReset)))
-
-	assert.Wait(sigc, []string{"dunno"}, time.Second)
+	plant.AssertLast(0, func(evt *event.Event) bool {
+		return evt.Topic() == "dunno"
+	})
+	plant.Reset()
 
 	// 4th run: try a bad action.
-	assert.OK(msh.Emit("lock-b", event.New("screwdriver")))
+	plant.Emit(event.New("screwdriver"))
 
-	time.Sleep(100 * time.Millisecond)
-
-	assert.OK(msh.Emit("collector-b", event.New(event.TopicProcess)))
-	assert.OK(msh.Emit("collector-b", event.New(event.TopicReset)))
-
-	assert.Wait(sigc, []string{"error"}, time.Second)
-	assert.OK(msh.Stop())
+	plant.AssertLast(0, func(evt *event.Event) bool {
+		return evt.Topic() == "error" && evt.Payload().At("message").AsString("-") == "don't try to break me"
+	})
 }
 
 //--------------------
@@ -167,8 +141,9 @@ func (m *lockMachine) Locked(emitter mesh.Emitter, evt *event.Event) behaviors.F
 		_ = emitter.Broadcast(event.New(
 			"error",
 			"id", m.id,
+			"message", "don't try to break me",
 		))
-		return behaviors.FSMStatus{evt.Topic(), nil, fmt.Errorf("don't try to break me")}
+		return behaviors.FSMStatus{"locked-error", nil, fmt.Errorf("don't try to break me")}
 	default:
 		_ = emitter.Broadcast(event.New(
 			"dunno",
@@ -218,47 +193,6 @@ func (m *lockMachine) Unlocked(emitter mesh.Emitter, evt *event.Event) behaviors
 		))
 	}
 	return behaviors.FSMStatus{"unlocked", m.Unlocked, nil}
-}
-
-// restorerBehavior for test.
-type restorerBehavior struct {
-	id      string
-	emitter mesh.Emitter
-	cents   int
-}
-
-func newRestorerBehavior(id string) mesh.Behavior {
-	return &restorerBehavior{
-		id:    id,
-		cents: 0,
-	}
-}
-
-func (b *restorerBehavior) ID() string {
-	return b.id
-}
-
-func (b *restorerBehavior) Init(emitter mesh.Emitter) error {
-	b.emitter = emitter
-	return nil
-}
-
-func (b *restorerBehavior) Terminate() error {
-	return nil
-}
-
-func (b *restorerBehavior) Process(evt *event.Event) {
-	switch evt.Topic() {
-	case "grab-coins":
-		_ = b.emitter.Broadcast(event.New("cents", "cents", b.cents))
-		b.cents = 0
-	case "drop-coins":
-		b.cents += payloadCents(evt)
-	}
-}
-
-func (b *restorerBehavior) Recover(err interface{}) error {
-	return nil
 }
 
 // EOF
