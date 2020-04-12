@@ -100,6 +100,10 @@ func TestSync(t *testing.T) {
 
 	assert.Equal(counter, 5)
 	assert.OK(act.Stop())
+
+	assert.ErrorMatch(act.DoSync(func() {
+		counter++
+	}), ".*timeout.*")
 }
 
 // TestTimeout tests timout error of a synchronous Action.

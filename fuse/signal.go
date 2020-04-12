@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"tideland.dev/go/trace/failure"
-	"tideland.dev/go/trace/location"
 )
 
 //--------------------
@@ -136,18 +135,6 @@ func (s *Signal) Wait(status Status, timeout time.Duration) error {
 		return nil
 	case <-time.After(timeout):
 		return failure.New("waiting signal for %v: timeout", status)
-	}
-}
-
-//--------------------
-// TRIGGER
-//--------------------
-
-// Trigger raises an annotated panic in case of an error.
-func Trigger(err error) {
-	if err != nil {
-		code := location.At(2).Code("PANIC")
-		panic(failure.Annotate(err, code))
 	}
 }
 

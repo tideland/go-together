@@ -34,13 +34,13 @@ func TestSignalWaitOK(t *testing.T) {
 	wg.Add(2)
 	asserter := func() {
 		defer wg.Done()
-		assert.NoError(signal.Wait(fuse.Starting, timeout))
-		assert.NoError(signal.Wait(fuse.Starting, timeout))
-		assert.NoError(signal.Wait(fuse.Ready, timeout))
-		assert.NoError(signal.Wait(fuse.Working, timeout))
-		assert.NoError(signal.Wait(fuse.Working, timeout))
-		assert.NoError(signal.Wait(fuse.Stopping, timeout))
-		assert.NoError(signal.Wait(fuse.Stopped, timeout))
+		assert.OK(signal.Wait(fuse.Starting, timeout))
+		assert.OK(signal.Wait(fuse.Starting, timeout))
+		assert.OK(signal.Wait(fuse.Ready, timeout))
+		assert.OK(signal.Wait(fuse.Working, timeout))
+		assert.OK(signal.Wait(fuse.Working, timeout))
+		assert.OK(signal.Wait(fuse.Stopping, timeout))
+		assert.OK(signal.Wait(fuse.Stopped, timeout))
 	}
 
 	// Test.
@@ -78,7 +78,7 @@ func TestSignalWaitDirectOK(t *testing.T) {
 		signal.Notify(fuse.Stopped)
 	}()
 
-	assert.NoError(signal.Wait(fuse.Working, timeout))
+	assert.OK(signal.Wait(fuse.Working, timeout))
 }
 
 // TestSignalWaitTimeout tests the timeout when waiting for
@@ -95,8 +95,8 @@ func TestSignalWaitTimeout(t *testing.T) {
 		signal.Notify(fuse.Working)
 	}()
 
-	assert.NoError(signal.Wait(fuse.Ready, timeout))
-	assert.NoError(signal.Wait(fuse.Working, timeout))
+	assert.OK(signal.Wait(fuse.Ready, timeout))
+	assert.OK(signal.Wait(fuse.Working, timeout))
 	assert.ErrorContains(signal.Wait(fuse.Stopped, timeout), "waiting signal for stopped: timeout")
 }
 

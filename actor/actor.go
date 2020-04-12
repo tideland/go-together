@@ -30,7 +30,7 @@ const (
 
 	// DefaultQueueCap is the minimum and default capacity
 	// of the async actions queue.
-	DefaultQueueCap = 64
+	DefaultQueueCap = 256
 )
 
 //--------------------
@@ -110,10 +110,20 @@ func Go(options ...Option) (*Actor, error) {
 // DoAsync send the actor function to the backend and returns
 // when it's queued.
 func (act *Actor) DoAsync(action Action) error {
+	return act.DoAsyncTimeout(action, DefaultTimeout)
+}
+
+// DoAsyncTimeout send the actor function to the backend and returns
+// when it's queued.
+func (act *Actor) DoAsyncTimeout(action Action, timeout time.Duration) error {
 	if !act.err.IsNil() {
 		return act.err.Get()
 	}
-	act.asyncActions <- action
+	select {
+	case act.asyncActions <- action:
+	case <-time.After(timeout):
+		return failure.New("asynchronous actor do: timeout")
+	}
 	return nil
 }
 
@@ -130,9 +140,14 @@ func (act *Actor) DoSyncTimeout(action Action, timeout time.Duration) error {
 		return act.err.Get()
 	}
 	done := make(chan struct{})
-	act.syncActions <- func() {
+	syncAction := func() {
 		action()
 		close(done)
+	}
+	select {
+	case act.syncActions <- syncAction:
+	case <-time.After(timeout):
+		return failure.New("synchronous actor do: timeout")
 	}
 	select {
 	case <-done:
