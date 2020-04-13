@@ -47,9 +47,9 @@ func TestSpawnCells(t *testing.T) {
 
 	ids := msh.Cells()
 	assert.Length(ids, 3)
-	assert.Contents("foo", ids)
-	assert.Contents("bar", ids)
-	assert.Contents("baz", ids)
+	assert.Contains("foo", ids)
+	assert.Contains("bar", ids)
+	assert.Contains("baz", ids)
 
 	assert.OK(msh.Stop())
 }
@@ -117,30 +117,30 @@ func TestStopCells(t *testing.T) {
 
 	ids := msh.Cells()
 	assert.Length(ids, 3)
-	assert.Contents("foo", ids)
-	assert.Contents("bar", ids)
-	assert.Contents("baz", ids)
+	assert.Contains("foo", ids)
+	assert.Contains("bar", ids)
+	assert.Contains("baz", ids)
 
 	assert.OK(msh.Subscribe("foo", "bar", "baz"))
 
 	fooS, err := msh.Subscribers("foo")
 	assert.OK(err)
 	assert.Length(fooS, 2)
-	assert.Contents("bar", fooS)
-	assert.Contents("baz", fooS)
+	assert.Contains("bar", fooS)
+	assert.Contains("baz", fooS)
 
 	// Stopping shall unsubscribe too.
 	assert.OK(msh.StopCells("baz"))
 
 	ids = msh.Cells()
 	assert.Length(ids, 2)
-	assert.Contents("foo", ids)
-	assert.Contents("bar", ids)
+	assert.Contains("foo", ids)
+	assert.Contains("bar", ids)
 
 	fooS, err = msh.Subscribers("foo")
 	assert.OK(err)
 	assert.Length(fooS, 1)
-	assert.Contents("bar", fooS)
+	assert.Contains("bar", fooS)
 
 	assert.OK(msh.Stop())
 }
@@ -305,8 +305,8 @@ func TestSubscribe(t *testing.T) {
 	fooS, err := msh.Subscribers("foo")
 	assert.OK(err)
 	assert.Length(fooS, 2)
-	assert.Contents("bar", fooS)
-	assert.Contents("baz", fooS)
+	assert.Contains("bar", fooS)
+	assert.Contains("baz", fooS)
 
 	// Send event to store subscribers
 	assert.OK(msh.Emit("foo", event.New("subscribers")))
@@ -349,8 +349,8 @@ func TestUnsubscribe(t *testing.T) {
 	fooS, err := msh.Subscribers("foo")
 	assert.OK(err)
 	assert.Length(fooS, 2)
-	assert.Contents("bar", fooS)
-	assert.Contents("baz", fooS)
+	assert.Contains("bar", fooS)
+	assert.Contains("baz", fooS)
 
 	// Unsubscribe baz.
 	assert.OK(msh.Unsubscribe("foo", "baz"))
@@ -358,7 +358,7 @@ func TestUnsubscribe(t *testing.T) {
 	fooS, err = msh.Subscribers("foo")
 	assert.OK(err)
 	assert.Length(fooS, 1)
-	assert.Contents("bar", fooS)
+	assert.Contains("bar", fooS)
 
 	assert.OK(msh.Stop())
 }
