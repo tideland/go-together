@@ -30,7 +30,7 @@ import (
 func TestSink(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	checkTopic := func(evt *event.Event) {
-		assert.Contents(evt.Topic(), topicData)
+		assert.Contains(evt.Topic(), topicData)
 	}
 
 	// Empty sink.
@@ -81,7 +81,7 @@ func TestSinkIteration(t *testing.T) {
 	assert.Length(sink, 10)
 
 	err := sink.Do(func(index int, evt *event.Event) error {
-		assert.Contents(evt.Topic(), topicData)
+		assert.Contains(evt.Topic(), topicData)
 		v := evt.Payload().At("bool").AsBool(false)
 		assert.True(v)
 		return nil
@@ -264,7 +264,7 @@ func TestSinkAnalyzer(t *testing.T) {
 	quantities := analyzer.TopicQuantities()
 	assert.Length(quantities, len(topicData))
 	for topic, quantity := range quantities {
-		assert.Contents(topic, topicData, "topic is one of the topics")
+		assert.Contains(topic, topicData, "topic is one of the topics")
 		assert.Range(quantity, 1, 100, "quantity is in range")
 	}
 
@@ -282,7 +282,7 @@ func TestSinkAnalyzer(t *testing.T) {
 	assert.NoError(err)
 	assert.Length(quantities, len(topicData))
 	for topic, payload := range payloads {
-		assert.Contents(topic, topicData, "topic is one of the topics")
+		assert.Contains(topic, topicData, "topic is one of the topics")
 		count := payload.At("count").AsInt(-1)
 		assert.Range(count, 1, 100, "quantity is in range")
 	}

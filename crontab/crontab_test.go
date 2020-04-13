@@ -78,8 +78,8 @@ func TestList(t *testing.T) {
 	jobs, err = crontab.List()
 	assert.NoError(err)
 	assert.Length(jobs, 2)
-	assert.Contents("fuddel-1", jobs)
-	assert.Contents("fuddel-2", jobs)
+	assert.Contains("fuddel-1", jobs)
+	assert.Contains("fuddel-2", jobs)
 
 	err = crontab.Revoke("fuddel-1")
 	assert.NoError(err)
@@ -94,7 +94,7 @@ func TestList(t *testing.T) {
 		}
 		return false
 	}())
-	assert.Contents("fuddel-2", jobs)
+	assert.Contains("fuddel-2", jobs)
 
 	err = crontab.Revoke("fuddel-2")
 	assert.NoError(err)
