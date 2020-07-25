@@ -12,26 +12,31 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 //--------------------
 
 import (
+	"context"
+
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
-	"tideland.dev/go/trace/logger"
 )
 
 //--------------------
 // LOGGER BEHAVIOR
 //--------------------
 
+// Logger defines the function the logger behavior uses for logging.
+type Logger func(id string, evt *event.Event)
+
 // loggerBehavior is a behaior for the logging of events.
 type loggerBehavior struct {
-	id      string
-	emitter mesh.Emitter
+	id  string
+	log Logger
 }
 
 // NewLoggerBehavior creates a logging behavior. It logs emitted
 // events with info level.
-func NewLoggerBehavior(id string) mesh.Behavior {
+func NewLoggerBehavior(id string, logger Logger) mesh.Behavior {
 	return &loggerBehavior{
-		id: id,
+		id:  id,
+		log: logger,
 	}
 }
 
@@ -41,8 +46,7 @@ func (b *loggerBehavior) ID() string {
 }
 
 // Init the behavior.
-func (b *loggerBehavior) Init(emitter mesh.Emitter) error {
-	b.emitter = emitter
+func (b *loggerBehavior) Init(ctx context.Context, emitter mesh.Emitter) error {
 	return nil
 }
 
@@ -53,7 +57,7 @@ func (b *loggerBehavior) Terminate() error {
 
 // Process logs the event at info level.
 func (b *loggerBehavior) Process(evt *event.Event) {
-	logger.Infof("(%s) logging event %v", b.id, evt)
+	b.log(b.id, evt)
 }
 
 // Recover from an error. Can't even log, it's a logging problem.

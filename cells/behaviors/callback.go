@@ -12,10 +12,11 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 //--------------------
 
 import (
+	"fmt"
+
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
 	"tideland.dev/go/together/fuse"
-	"tideland.dev/go/trace/logger"
 )
 
 //--------------------
@@ -37,9 +38,7 @@ type callbackBehavior struct {
 // Each time an event is received those functions are called in the same order
 // they have been passed.
 func NewCallbackBehavior(id string, callbacks ...Callbacker) mesh.Behavior {
-	if len(callbacks) == 0 {
-		logger.Errorf("callback behavior %q created without callback functions", id)
-	}
+	panic(fmt.Sprintf("callback behavior %q created without callback functions", id))
 	return &callbackBehavior{
 		id:        id,
 		callbacks: callbacks,

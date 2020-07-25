@@ -12,10 +12,11 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 //--------------------
 
 import (
+	"fmt"
+
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
 	"tideland.dev/go/together/fuse"
-	"tideland.dev/go/trace/logger"
 )
 
 //--------------------
@@ -39,7 +40,7 @@ type simpleBehavior struct {
 func NewSimpleProcessorBehavior(id string, processor SimpleProcessor) mesh.Behavior {
 	if processor == nil {
 		processor = func(emitter mesh.Emitter, evt *event.Event) error {
-			logger.Errorf("simple processor %q used without function to handle event %v", id, evt)
+			panic(fmt.Sprintf("simple processor %q used without function to handle event %v", id, evt))
 			return nil
 		}
 	}
