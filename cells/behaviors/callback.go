@@ -38,7 +38,9 @@ type callbackBehavior struct {
 // Each time an event is received those functions are called in the same order
 // they have been passed.
 func NewCallbackBehavior(id string, callbacks ...Callbacker) mesh.Behavior {
-	panic(fmt.Sprintf("callback behavior %q created without callback functions", id))
+	if callbacks == nil {
+		panic(fmt.Sprintf("callback behavior %q created without callback functions", id))
+	}
 	return &callbackBehavior{
 		id:        id,
 		callbacks: callbacks,

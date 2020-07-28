@@ -12,8 +12,6 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 //--------------------
 
 import (
-	"context"
-
 	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
 )
@@ -34,6 +32,9 @@ type loggerBehavior struct {
 // NewLoggerBehavior creates a logging behavior. It logs emitted
 // events with info level.
 func NewLoggerBehavior(id string, logger Logger) mesh.Behavior {
+	if logger == nil {
+		panic("logger behavior '" + id + "' has no logger function")
+	}
 	return &loggerBehavior{
 		id:  id,
 		log: logger,
@@ -46,7 +47,7 @@ func (b *loggerBehavior) ID() string {
 }
 
 // Init the behavior.
-func (b *loggerBehavior) Init(ctx context.Context, emitter mesh.Emitter) error {
+func (b *loggerBehavior) Init(emitter mesh.Emitter) error {
 	return nil
 }
 
