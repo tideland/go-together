@@ -21,7 +21,7 @@ import (
 )
 
 //--------------------
-// BEHAV
+// STUBS
 //--------------------
 
 // emitterStub provides the test object the emitter.
