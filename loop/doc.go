@@ -34,10 +34,10 @@
 //         return p, nil
 //     }
 //
-//     func (p *printer) worker(lt loop.Terminator) error {
+//     func (p *printer) worker(ctx context.Context) error {
 //         for {
 //             select {
-//             case <-lt.Done():
+//             case <-ctx.Done():
 //                 return nil
 //             case str := <-p.prints:
 //                 println(str)
@@ -45,9 +45,9 @@
 //     }
 //
 // The worker here now can be stopped with p.loop.Stop() returning
-// a possible internal error. Also recovering of internal errors or
-// panics by starting the loop with a recoverer function is possible.
-// See the code examples.
+// a possible internal error. Also recovering of internal panics with
+// a repairer function passed as option is possible. See the code
+// examples.
 package loop // import "tideland.dev/go/together/loop"
 
 // EOF
