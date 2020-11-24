@@ -41,10 +41,10 @@ func WithQueueCap(c int) Option {
 	}
 }
 
-// WithRecoverer defines the panic handler of an actor.
-func WithRecoverer(recoverer Recoverer) Option {
+// WithRepairer defines the panic handler of an actor.
+func WithRepairer(repairer Repairer) Option {
 	return func(act *Actor) error {
-		act.recoverer = recoverer
+		act.repairer = repairer
 		return nil
 	}
 }

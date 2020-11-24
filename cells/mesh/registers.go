@@ -66,12 +66,9 @@ func (cr cellRegistry) add(id string, c *cell) {
 }
 
 // removes deregisters a cell.
-func (cr cellRegistry) remove(id string) error {
-	if err := cr[id].cell.stop(); err != nil {
-		return err
-	}
+func (cr cellRegistry) remove(id string) {
+	cr[id].cell.stop()
 	delete(cr, id)
-	return nil
 }
 
 // subscribe subscribes the wanted subscribers to a cell and also tells

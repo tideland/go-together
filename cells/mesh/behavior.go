@@ -57,11 +57,11 @@ type Behavior interface {
 	// Process is called to process the given event.
 	Process(evt *event.Event)
 
-	// Recover is called in case of an error or panic during the processing
+	// Repair is called in case of an error or panic during the processing
 	// of an event. Here the behavior can check if it can recover and establish
 	// a valid state. If it's not possible the implementation has to return
 	// an error documenting the reason.
-	Recover(err interface{}) error
+	Repair(err interface{}) error
 }
 
 //--------------------

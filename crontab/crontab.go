@@ -12,6 +12,7 @@ package crontab // import "tideland.dev/go/together/crontab"
 //--------------------
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"sync"
@@ -82,7 +83,7 @@ func newCronjob(id string, s *time.Time, i *time.Duration, j func() error) *cron
 	}
 	l, err := loop.Go(
 		cj.worker,
-		loop.WithRecoverer(cj.recoverer),
+		loop.WithRepairer(cj.recoverer),
 	)
 	if err != nil {
 		panic("start cronjob: " + err.Error())
@@ -92,12 +93,12 @@ func newCronjob(id string, s *time.Time, i *time.Duration, j func() error) *cron
 }
 
 // stop ends the cronjob goroutine.
-func (cj *cronjob) stop() error {
-	return cj.loop.Stop()
+func (cj *cronjob) stop() {
+	cj.loop.Stop()
 }
 
 // worker runs the cronjob.
-func (cj *cronjob) worker(lt loop.Terminator) error {
+func (cj *cronjob) worker(ctx context.Context) error {
 	// Init.
 	var interval time.Duration
 	if cj.start != nil {
@@ -108,7 +109,7 @@ func (cj *cronjob) worker(lt loop.Terminator) error {
 	// Loop.
 	for {
 		select {
-		case <-lt.Done():
+		case <-ctx.Done():
 			return nil
 		case <-time.After(interval):
 			if err := cj.job(); err != nil {
@@ -216,7 +217,7 @@ func Revoke(id string) error {
 	if aerr := ct.act.DoSync(func() {
 		if job, ok := ct.jobs[id]; ok {
 			delete(ct.jobs, id)
-			err = job.stop()
+			job.stop()
 			return
 		}
 		err = fmt.Errorf("job ID '%s' does not exist", id)
