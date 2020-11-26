@@ -111,11 +111,15 @@ func (act *Actor) DoAsyncTimeout(action Action, timeout time.Duration) error {
 		act.mu.Unlock()
 		return act.err
 	}
+	if !act.works {
+		act.mu.Unlock()
+		return fmt.Errorf("actor doesn't work anymore")
+	}
 	act.mu.Unlock()
 	select {
 	case act.asyncActions <- action:
 	case <-time.After(timeout):
-		return fmt.Errorf("asynchronous actor do: timeout")
+		return fmt.Errorf("timeout")
 	}
 	return nil
 }
@@ -134,6 +138,10 @@ func (act *Actor) DoSyncTimeout(action Action, timeout time.Duration) error {
 		act.mu.Unlock()
 		return act.err
 	}
+	if !act.works {
+		act.mu.Unlock()
+		return fmt.Errorf("actor doesn't work anymore")
+	}
 	act.mu.Unlock()
 	done := make(chan struct{})
 	syncAction := func() {
@@ -143,7 +151,7 @@ func (act *Actor) DoSyncTimeout(action Action, timeout time.Duration) error {
 	select {
 	case act.syncActions <- syncAction:
 	case <-time.After(timeout):
-		return fmt.Errorf("timeout during synchronous actor action")
+		return fmt.Errorf("timeout")
 	}
 	select {
 	case <-done:
@@ -151,7 +159,7 @@ func (act *Actor) DoSyncTimeout(action Action, timeout time.Duration) error {
 		if !act.works {
 			return act.err
 		}
-		return fmt.Errorf("timeout during synchronous actor action")
+		return fmt.Errorf("timeout")
 	}
 	return nil
 }
@@ -171,6 +179,7 @@ func (act *Actor) Stop() {
 		// Already stopped.
 		return
 	}
+	act.works = false
 	act.cancel()
 }
 
@@ -209,7 +218,6 @@ func (act *Actor) work() {
 	for {
 		select {
 		case <-act.ctx.Done():
-			act.works = false
 			return
 		case action := <-act.asyncActions:
 			action()
