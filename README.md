@@ -13,7 +13,6 @@
 
 * `actor` runs a backend goroutine processing anonymous functions for the serialization of changes, e.g. in a structure
 * `cells` provides an event processing based on the idea of meshed cells with different behaviors
-* `crontab` allows running functions at configured times and in chronological order
 * `fuse` contains some ways of status and error control in concurrent applications
 * `limiter` limits the number of parallel executing goroutines in its scope
 * `loop` helps running a controlled endless `select` loop for goroutine backends
