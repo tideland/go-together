@@ -153,7 +153,7 @@ func (tp *TestPlant) Emit(evt *event.Event) {
 	defer func() {
 		if r := recover(); r != nil {
 			// TODO Add way to test wanted recoverings.
-			tp.assert.OK(tp.behavior.Recover(r))
+			tp.assert.OK(tp.behavior.Repair(r))
 		}
 	}()
 	tp.behavior.Process(evt)

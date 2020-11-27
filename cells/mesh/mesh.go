@@ -79,9 +79,7 @@ func (msh *Mesh) StopCells(ids ...string) error {
 		if err := msh.cells.unsubscribeFromAll(id); err != nil {
 			return err
 		}
-		if err := msh.cells.remove(id); err != nil {
-			return err
-		}
+		msh.cells.remove(id)
 	}
 	return nil
 }
@@ -151,19 +149,13 @@ func (msh *Mesh) Broadcast(evt *event.Event) error {
 }
 
 // Stop terminates the cells and cleans up.
-func (msh *Mesh) Stop() error {
+func (msh *Mesh) Stop() {
 	msh.mu.Lock()
 	defer msh.mu.Unlock()
-	var errs []error
-	// Terminate.
 	for _, entry := range msh.cells {
-		if err := entry.cell.stop(); err != nil {
-			errs = append(errs, err)
-		}
+		entry.cell.stop()
 	}
 	msh.cells = cellRegistry{}
-	// Return collected errors.
-	return failure.Collect(errs...)
 }
 
 // EOF

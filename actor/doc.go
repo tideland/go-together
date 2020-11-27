@@ -38,7 +38,7 @@
 //         })
 //     }
 //
-//     func (c* Counter) Get() (int, error) {
+//     func (c *Counter) Get() (int, error) {
 //         var counter int
 //         if c.act.DoSync(func() {
 //             counter = c.counter
@@ -47,6 +47,10 @@
 //         }
 //         return counter, nil
 //     }
+//
+//    func (c *Counter) Stop() {
+//        c.act.Stop()
+//    }
 //
 // Different options for the constructor allow to pass a context for stopping,
 // how many actions are queued, and how panics in actions shall be handled.

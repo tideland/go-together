@@ -52,7 +52,7 @@ func newCell(msh *Mesh, behavior Behavior) (*cell, error) {
 	// Start the backend.
 	act, err := actor.Go(
 		actor.WithQueueCap(c.queueCap),
-		actor.WithRecoverer(behavior.Recover),
+		actor.WithRepairer(behavior.Repair),
 		actor.WithFinalizer(c.finalize),
 	)
 	if err != nil {
@@ -165,11 +165,8 @@ func (c *cell) finalize(err error) error {
 
 // stop tells the actor to stop with finalizing for termination
 // of the behavior.
-func (c *cell) stop() error {
-	if aerr := c.act.Stop(); aerr != nil {
-		return failure.Annotate(aerr, "stopping cell %q", c.behavior.ID())
-	}
-	return nil
+func (c *cell) stop() {
+	c.act.Stop()
 }
 
 //--------------------
@@ -195,7 +192,7 @@ func (db *terminatedBehavior) Terminate() error {
 
 func (db *terminatedBehavior) Process(evt *event.Event) {}
 
-func (db *terminatedBehavior) Recover(r interface{}) error {
+func (db *terminatedBehavior) Repair(r interface{}) error {
 	return nil
 }
 

@@ -51,7 +51,7 @@ func TestSpawnCells(t *testing.T) {
 	assert.Contains("bar", ids)
 	assert.Contains("baz", ids)
 
-	assert.OK(msh.Stop())
+	msh.Stop()
 }
 
 // TestSpawnDoubleCells verifies starting the mesh, spawning double
@@ -74,7 +74,7 @@ func TestSpawnDoubleCells(t *testing.T) {
 	ids := msh.Cells()
 	assert.Length(ids, 1)
 
-	assert.OK(msh.Stop())
+	msh.Stop()
 }
 
 // TestSpawnErrorCells verifies starting the mesh, spawning cell
@@ -99,7 +99,7 @@ func TestSpawnErrorCells(t *testing.T) {
 	ids := msh.Cells()
 	assert.Length(ids, 3)
 
-	assert.OK(msh.Stop())
+	msh.Stop()
 }
 
 // TestStopCells verifies stopping some cells.
@@ -142,7 +142,7 @@ func TestStopCells(t *testing.T) {
 	assert.Length(fooS, 1)
 	assert.Contains("bar", fooS)
 
-	assert.OK(msh.Stop())
+	msh.Stop()
 }
 
 // TestTermination verifies calling the termination method.
@@ -496,7 +496,7 @@ func (tb *TestBehavior) Process(evt *event.Event) {
 	}
 }
 
-func (tb *TestBehavior) Recover(r interface{}) error {
+func (tb *TestBehavior) Repair(r interface{}) error {
 	return nil
 }
 
