@@ -29,6 +29,14 @@ type Payload interface {
 	DeepCopy() Payload
 }
 
+// emptyPayload is used if an event with payload nil is created.
+type emptyPayload struct{}
+
+// DeepCopy implements Payload.
+func (ep emptyPayload) DeepCopy() Payload {
+	return ep
+}
+
 // KeyValuePayload implements payload and contains a number of key/value
 // pairs where the values having the types string, int, float64, bool, or
 // Payload.
@@ -236,10 +244,16 @@ type Event struct {
 // NewEvent creates a new event based on topic and payload. The latter
 // will be deep copied and so can be reused for other events too.
 func NewEvent(topic string, payload Payload) *Event {
+	var pc Payload
+	if payload == nil {
+		pc = emptyPayload{}
+	} else {
+		pc = payload.DeepCopy()
+	}
 	return &Event{
 		timestamp: time.Now().UTC(),
 		topic:     topic,
-		payload:   payload.DeepCopy(),
+		payload:   pc,
 	}
 }
 

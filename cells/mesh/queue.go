@@ -28,7 +28,7 @@ type queue struct {
 }
 
 // newQueue creates a queue instance with the given buffer size.
-func newQueue(size int) *Queue {
+func newQueue(size int) *queue {
 	return &queue{
 		eventc: make(chan *Event, size),
 	}
