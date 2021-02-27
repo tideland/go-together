@@ -18,74 +18,82 @@ import (
 )
 
 //--------------------
-// PAYLOAD
+// COPYABLE
 //--------------------
 
-// Payload defines the interface for event payloads which are only defined
-// by the property to be deep copyable.
-type Payload interface {
-	// DeepCopy has to be implemented by the concrete payload to ensure
+// Copyable defines the interface for event values which are only
+// defined by being copyable.
+type Copyable interface {
+	// Copy has to be implemented by the concrete value to ensure
 	// that only copies will be transported.
-	DeepCopy() Payload
+	Copy() Copyable
 }
 
-// emptyPayload is used if an event with payload nil is created.
-type emptyPayload struct{}
+// CopyableFunc allows to pass a function as value inside an event.
+type CopyableFunc func(arg Copyable) error
 
-// DeepCopy implements Payload.
-func (ep emptyPayload) DeepCopy() Payload {
-	return ep
+// Exec executes the function of the copyable func.
+func (cf CopyableFunc) Exec(arg Copyable) error {
+	return cf(arg)
 }
 
-// KeyValuePayload implements payload and contains a number of key/value
-// pairs where the values having the types string, int, float64, bool, or
-// Payload.
-type KeyValuePayload struct {
-	keyValues map[string]interface{}
+// Copy implements Copyable.
+func (cf CopyableFunc) Copy() Copyable {
+	return cf
 }
 
-// IsKeyValuePayload checks if a payload us a key/value payload.
-func IsKeyValuePayload(p Payload) (*KeyValuePayload, bool) {
-	kvp, ok := p.(*KeyValuePayload)
-	return kvp, ok
+// IsCopyableFunc checks if an arument is a copyable function.
+func IsCopyableFunc(v interface{}) (CopyableFunc, bool) {
+	cf, ok := v.(CopyableFunc)
+	return cf, ok
 }
 
-// NewKeyValuePayload creates a key/value payload by parsing the passed
-// keys and values. Those are alternating keys and values. Keys will
-// be converted to strings if needed, also invalid values. A final key
-// will be set to true.
-func NewKeyValuePayload(kvs ...interface{}) *KeyValuePayload {
-	kvp := &KeyValuePayload{
-		keyValues: map[string]interface{}{},
+//--------------------
+// EVENT
+//--------------------
+
+// Event transports a topic and a payload a cell can process.
+type Event struct {
+	timestamp time.Time
+	topic     string
+	kvs       map[string]interface{}
+}
+
+// NewEvent creates a new event based on a topic. Additionally
+// a set of keys and values can be added. The given values will
+// be interpreted as alternating keys and values. Keys will
+// be converted to strings if needed, also invalid values. A
+// final key without a value will be set to true.
+func NewEvent(topic string, kvs ...interface{}) *Event {
+	evt := &Event{
+		timestamp: time.Now().UTC(),
+		topic:     topic,
+		kvs:       make(map[string]interface{}),
 	}
-	kvp.setKeyValues(kvs...)
-	return kvp
+	evt.parseKVS(kvs...)
+	return evt
 }
 
-// Has check if the key/value payload contains the passed key.
-func (kvp *KeyValuePayload) Has(key string) bool {
-	_, ok := kvp.keyValues[key]
+// Timestamp returns the event timestamp.
+func (evt *Event) Timestamp() time.Time {
+	return evt.timestamp
+}
+
+// Topic returns the event topic.
+func (evt *Event) Topic() string {
+	return evt.topic
+}
+
+// HasValue checks if the event values contain one with
+// the given key.
+func (evt *Event) HasValue(key string) bool {
+	_, ok := evt.kvs[key]
 	return ok
 }
 
-// At returns the value of the key. If there's no value nil will be
-// returned.
-func (kvp *KeyValuePayload) At(key string) interface{} {
-	tmp, ok := kvp.keyValues[key]
-	if !ok {
-		return nil
-	}
-	switch value := tmp.(type) {
-	case Payload:
-		return value.DeepCopy()
-	default:
-		return tmp
-	}
-}
-
 // StringAt returns a value if it is a string.
-func (kvp *KeyValuePayload) StringAt(key string) (string, bool) {
-	tmp, ok := kvp.keyValues[key]
+func (evt *Event) StringAt(key string) (string, bool) {
+	tmp, ok := evt.kvs[key]
 	if !ok {
 		return "", false
 	}
@@ -94,8 +102,8 @@ func (kvp *KeyValuePayload) StringAt(key string) (string, bool) {
 }
 
 // IntAt returns a value if it is an int.
-func (kvp *KeyValuePayload) IntAt(key string) (int, bool) {
-	tmp, ok := kvp.keyValues[key]
+func (evt *Event) IntAt(key string) (int, bool) {
+	tmp, ok := evt.kvs[key]
 	if !ok {
 		return 0, false
 	}
@@ -104,8 +112,8 @@ func (kvp *KeyValuePayload) IntAt(key string) (int, bool) {
 }
 
 // Float64At returns a value if it is a float64.
-func (kvp *KeyValuePayload) Float64At(key string) (float64, bool) {
-	tmp, ok := kvp.keyValues[key]
+func (evt *Event) Float64At(key string) (float64, bool) {
+	tmp, ok := evt.kvs[key]
 	if !ok {
 		return 0.0, false
 	}
@@ -114,8 +122,8 @@ func (kvp *KeyValuePayload) Float64At(key string) (float64, bool) {
 }
 
 // BoolAt returns a value if it is a bool.
-func (kvp *KeyValuePayload) BoolAt(key string) (bool, bool) {
-	tmp, ok := kvp.keyValues[key]
+func (evt *Event) BoolAt(key string) (bool, bool) {
+	tmp, ok := evt.kvs[key]
 	if !ok {
 		return false, false
 	}
@@ -123,61 +131,49 @@ func (kvp *KeyValuePayload) BoolAt(key string) (bool, bool) {
 	return value, ok
 }
 
-// PayloadAt returns a value if it is a payload.
-func (kvp *KeyValuePayload) PayloadAt(key string) (Payload, bool) {
-	tmp, ok := kvp.keyValues[key]
+// CopyableAt returns a value if it is a Copyable.
+func (evt *Event) CopyableAt(key string) (Copyable, bool) {
+	tmp, ok := evt.kvs[key]
 	if !ok {
 		return nil, false
 	}
-	value, ok := tmp.(Payload)
-	return value, ok
+	value, ok := tmp.(Copyable)
+	if !ok {
+		return nil, false
+	}
+	return value.Copy(), true
 }
 
-// Do performs the given function for all keys and values.
-func (kvp *KeyValuePayload) Do(f func(key string, value interface{})) {
-	for key, tmp := range kvp.keyValues {
+// ValueLen returns the number of values.
+func (evt *Event) ValueLen() int {
+	return len(evt.kvs)
+}
+
+// ValuesDo performs the given function for all keys and values.
+func (evt *Event) ValuesDo(f func(key string, value interface{})) {
+	for key, tmp := range evt.kvs {
 		switch value := tmp.(type) {
-		case Payload:
-			f(key, value.DeepCopy())
+		case Copyable:
+			f(key, value.Copy())
 		default:
 			f(key, tmp)
 		}
 	}
 }
 
-// Len returns the number of values of the payload.
-func (kvp *KeyValuePayload) Len() int {
-	return len(kvp.keyValues)
-}
-
 // String implements fmt.Stringer.
-func (kvp *KeyValuePayload) String() string {
-	var kvs []string
-	for key, value := range kvp.keyValues {
-		kvs = append(kvs, fmt.Sprintf("%s:%v", key, value))
+func (evt *Event) String() string {
+	var kvss []string
+	for key, value := range evt.kvs {
+		kvss = append(kvss, fmt.Sprintf("%s:%v", key, value))
 	}
-	return fmt.Sprintf("Payload[%s]", strings.Join(kvs, " "))
+	tmpl := "Event{Topic: %v Values:[%s]}"
+	return fmt.Sprintf(tmpl, evt.topic, strings.Join(kvss, " "))
 }
 
-// DeepCopy implements Payload.
-func (kvp *KeyValuePayload) DeepCopy() Payload {
-	dc := &KeyValuePayload{
-		keyValues: map[string]interface{}{},
-	}
-	for key, tmp := range kvp.keyValues {
-		switch value := tmp.(type) {
-		case Payload:
-			dc.keyValues[key] = value.DeepCopy()
-		default:
-			dc.keyValues[key] = value
-		}
-	}
-	return dc
-}
-
-// setKeyValues iterates over the key/value values and adds
+// parseKVS iterates over the key/value values and adds
 // them to the payloads values.
-func (kvp *KeyValuePayload) setKeyValues(kvs ...interface{}) {
+func (evt *Event) parseKVS(kvs ...interface{}) {
 	var key string
 	for i, kv := range kvs {
 		if i%2 == 0 {
@@ -191,90 +187,19 @@ func (kvp *KeyValuePayload) setKeyValues(kvs ...interface{}) {
 				key = fmt.Sprintf("%v", kv)
 			}
 			// Preset with a default key.
-			kvp.keyValues[key] = true
+			evt.kvs[key] = true
 			continue
 		}
 		// Talking about a value.
 		switch tmp := kv.(type) {
-		case string, int, float64, bool, Payload:
-			kvp.keyValues[key] = tmp
+		case string, int, float64, bool, Copyable:
+			evt.kvs[key] = tmp
 		case fmt.Stringer:
-			kvp.keyValues[key] = tmp.String()
+			evt.kvs[key] = tmp.String()
 		default:
-			kvp.keyValues[key] = fmt.Sprintf("%v", kv)
+			evt.kvs[key] = fmt.Sprintf("%v", kv)
 		}
 	}
-}
-
-// FuncPayload allows to pass a function as payload inside an event.
-type FuncPayload func(arg Payload) error
-
-// IsFuncPayload checks if a payload is a function payload.
-func IsFuncPayload(p Payload) (FuncPayload, bool) {
-	fp, ok := p.(FuncPayload)
-	return fp, ok
-}
-
-// NewFuncPayload creates a function payload out of the given function.
-func NewFuncPayload(f func(arg Payload) error) FuncPayload {
-	return FuncPayload(f)
-}
-
-// Exec executes the function of the fuction payload.
-func (fp FuncPayload) Exec(arg Payload) error {
-	return fp(arg)
-}
-
-// DeepCopy implements Payload.
-func (fp FuncPayload) DeepCopy() Payload {
-	return fp
-}
-
-//--------------------
-// EVENT
-//--------------------
-
-// Event transports a topic and a payload a cell can process.
-type Event struct {
-	timestamp time.Time
-	topic     string
-	payload   Payload
-}
-
-// NewEvent creates a new event based on topic and payload. The latter
-// will be deep copied and so can be reused for other events too.
-func NewEvent(topic string, payload Payload) *Event {
-	var pc Payload
-	if payload == nil {
-		pc = emptyPayload{}
-	} else {
-		pc = payload.DeepCopy()
-	}
-	return &Event{
-		timestamp: time.Now().UTC(),
-		topic:     topic,
-		payload:   pc,
-	}
-}
-
-// Timestamp returns the event timestamp.
-func (e *Event) Timestamp() time.Time {
-	return e.timestamp
-}
-
-// Topic returns the event topic.
-func (e *Event) Topic() string {
-	return e.topic
-}
-
-// Payload returns the event payload.
-func (e *Event) Payload() Payload {
-	return e.payload
-}
-
-// String implements fmt.Stringer.
-func (e *Event) String() string {
-	return fmt.Sprintf("Event{Topic: %v, Payload: %v}", e.topic, e.payload)
 }
 
 // EOF
