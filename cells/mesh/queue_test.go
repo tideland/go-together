@@ -13,6 +13,7 @@ package mesh
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"tideland.dev/go/audit/asserts"
@@ -30,6 +31,10 @@ func TestQueueSimple(t *testing.T) {
 	q := newQueue(16)
 	topics := []string{"one", "two", "three", "four", "five"}
 
+	var wg sync.WaitGroup
+
+	wg.Add(20)
+
 	go func() {
 		for {
 			select {
@@ -37,15 +42,18 @@ func TestQueueSimple(t *testing.T) {
 				return
 			case evt := <-q.Pull():
 				assert.Contains(evt.Topic(), topics)
+				wg.Done()
 			}
 		}
 	}()
 
 	for i := 0; i < 20; i++ {
 		topic := topics[i%len(topics)]
-		q.Append(NewEvent(topic, nil))
+		err := q.Append(NewEvent(topic, nil))
+		assert.NoError(err)
 	}
 
+	wg.Wait()
 	cancel()
 }
 
