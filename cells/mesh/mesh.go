@@ -51,6 +51,8 @@ func (m *Mesh) Go(name string, b Behavior) error {
 // Subscribe subscribes the cell with from name to the cell
 // with to name.
 func (m *Mesh) Subscribe(fromName, toName string) error {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	fromCell := m.cells[fromName]
 	toCell := m.cells[toName]
 	if fromCell == nil {
@@ -61,6 +63,17 @@ func (m *Mesh) Subscribe(fromName, toName string) error {
 	}
 	fromCell.subscribe(toCell)
 	return nil
+}
+
+// Raise appends an event to the in-queue of a cell.
+func (m *Mesh) Raise(name string, evt *Event) error {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	raiseCell := m.cells[name]
+	if raiseCell == nil {
+		return fmt.Errorf("cell %q does not exist", name)
+	}
+	return raiseCell.in.Append(evt)
 }
 
 // EOF
