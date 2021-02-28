@@ -13,8 +13,9 @@ package mesh
 
 import (
 	"context"
-	"sync"
+	"strings"
 	"testing"
+	"time"
 
 	"tideland.dev/go/audit/asserts"
 )
@@ -28,25 +29,60 @@ import (
 func TestCellSimple(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	ctx, cancel := context.WithCancel(context.Background())
-
-	var wg sync.WaitGroup
-
-	wg.Add(3)
-
-	tb := &testBehavior{
-		f: func(evt *Event, out OutputStream) {
-			t := evt.Topic()
-			assert.Contains(t, []string{"one", "two", "three"})
-			wg.Done()
-		},
+	topics := []string{}
+	sigc := make(chan interface{})
+	collector := func(evt *Event, out OutputStream) {
+		topics = append(topics, evt.Topic())
+		if len(topics) == 3 {
+			close(sigc)
+		}
 	}
-	c := newCell(ctx, "test", tb)
+	tbCollector := &testBehavior{f: collector}
+	cCollector := newCell(ctx, "collector", tbCollector)
 
-	c.in.Emit(NewEvent("one", nil))
-	c.in.Emit(NewEvent("two", nil))
-	c.in.Emit(NewEvent("three", nil))
+	cCollector.in.Emit(NewEvent("one"))
+	cCollector.in.Emit(NewEvent("two"))
+	cCollector.in.Emit(NewEvent("three"))
 
-	wg.Wait()
+	assert.WaitClosed(sigc, time.Second)
+	assert.Length(topics, 3)
+	assert.Equal(strings.Join(topics, " "), "one two three")
+
+	cancel()
+}
+
+// TestCellChain provides a chained processing of some
+// events.
+func TestCellChain(t *testing.T) {
+	assert := asserts.NewTesting(t, asserts.FailStop)
+	ctx, cancel := context.WithCancel(context.Background())
+	topics := []string{}
+	sigc := make(chan interface{})
+	upcaser := func(evt *Event, out OutputStream) {
+		upperTopic := strings.ToUpper(evt.Topic())
+		out.Emit(NewEvent(upperTopic))
+	}
+	tbUpcaser := &testBehavior{f: upcaser}
+	cUpcaser := newCell(ctx, "upcaser", tbUpcaser)
+	collector := func(evt *Event, out OutputStream) {
+		topics = append(topics, evt.Topic())
+		if len(topics) == 3 {
+			close(sigc)
+		}
+	}
+	tbCollector := &testBehavior{f: collector}
+	cCollector := newCell(ctx, "collector", tbCollector)
+
+	cCollector.subscribe(cUpcaser)
+
+	cUpcaser.in.Emit(NewEvent("one"))
+	cUpcaser.in.Emit(NewEvent("two"))
+	cUpcaser.in.Emit(NewEvent("three"))
+
+	assert.WaitClosed(sigc, time.Second)
+	assert.Length(topics, 3)
+	assert.Equal(strings.Join(topics, " "), "ONE TWO THREE")
+
 	cancel()
 }
 

@@ -28,4 +28,38 @@ type Behavior interface {
 	Go(ctx context.Context, name string, in InputStream, out OutputStream)
 }
 
+//--------------------
+// BEHAVIORS
+//--------------------
+
+// EventProcessingFunc defines a function signature for the simple
+// event processing behavior. This function processes every event.
+type EventProcessingFunc func(evt *Event, out OutputStream)
+
+// EventProcessingBehavior is a simple behavior using a function
+// to process the received events.
+type EventProcessingBehavior struct {
+	epf EventProcessingFunc
+}
+
+// NewEventProcessingBehavior creates a behavior based on the given
+// processing function.
+func NewEventProcessingBehavior(epf EventProcessingFunc) EventProcessingBehavior {
+	return EventProcessingBehavior{
+		epf: epf,
+	}
+}
+
+// Go implements Behavior.
+func (epb EventProcessingBehavior) Go(ctx context.Context, name string, in InputStream, out OutputStream) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case evt := <-in.Pull():
+			epb.epf(evt, out)
+		}
+	}
+}
+
 // EOF
