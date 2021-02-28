@@ -73,7 +73,7 @@ func (m *Mesh) Raise(name string, evt *Event) error {
 	if raiseCell == nil {
 		return fmt.Errorf("cell %q does not exist", name)
 	}
-	return raiseCell.in.Append(evt)
+	return raiseCell.in.Emit(evt)
 }
 
 // EOF

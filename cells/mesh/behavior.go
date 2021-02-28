@@ -25,7 +25,7 @@ type Behavior interface {
 	// of the implementation to run a select loop, receive incomming
 	// events via the input queue, and emit events via the output queue
 	// if needed.
-	Go(ctx context.Context, name string, in InputQueue, out OutputQueue)
+	Go(ctx context.Context, name string, in InputStream, out OutputStream)
 }
 
 // EOF

@@ -23,12 +23,12 @@ import (
 // TESTS
 //--------------------
 
-// TestQueueSimple verifies simple appending and pulling of events
-// via a queue.
-func TestQueueSimple(t *testing.T) {
+// TestStreamSimple verifies simple emitting and pulling of events
+// via a stream.
+func TestStreamSimple(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	ctx, cancel := context.WithCancel(context.Background())
-	q := newQueue(16)
+	str := newStream(16)
 	topics := []string{"one", "two", "three", "four", "five"}
 
 	var wg sync.WaitGroup
@@ -40,7 +40,7 @@ func TestQueueSimple(t *testing.T) {
 			select {
 			case <-ctx.Done():
 				return
-			case evt := <-q.Pull():
+			case evt := <-str.Pull():
 				assert.Contains(evt.Topic(), topics)
 				wg.Done()
 			}
@@ -49,7 +49,7 @@ func TestQueueSimple(t *testing.T) {
 
 	for i := 0; i < 20; i++ {
 		topic := topics[i%len(topics)]
-		err := q.Append(NewEvent(topic, nil))
+		err := str.Emit(NewEvent(topic, nil))
 		assert.NoError(err)
 	}
 

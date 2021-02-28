@@ -24,8 +24,8 @@ type cell struct {
 	ctx      context.Context
 	name     string
 	behavior Behavior
-	in       *queue
-	out      *queues
+	in       *stream
+	out      *streams
 }
 
 // newCell starts a new cell working in the background.
@@ -34,8 +34,8 @@ func newCell(ctx context.Context, name string, b Behavior) *cell {
 		ctx:      ctx,
 		name:     name,
 		behavior: b,
-		in:       newQueue(16),
-		out:      newQueues(),
+		in:       newStream(16),
+		out:      newStreams(),
 	}
 	go c.behavior.Go(c.ctx, c.name, c.in, c.out)
 	return c

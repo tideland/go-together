@@ -30,10 +30,10 @@ type Copyable interface {
 }
 
 // CopyableFunc allows to pass a function as value inside an event.
-type CopyableFunc func(arg Copyable) error
+type CopyableFunc func(arg interface{}) error
 
 // Exec executes the function of the copyable func.
-func (cf CopyableFunc) Exec(arg Copyable) error {
+func (cf CopyableFunc) Exec(arg interface{}) error {
 	return cf(arg)
 }
 

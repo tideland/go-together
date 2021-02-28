@@ -34,7 +34,7 @@ func TestCellSimple(t *testing.T) {
 	wg.Add(3)
 
 	tb := &testBehavior{
-		f: func(evt *Event, out OutputQueue) {
+		f: func(evt *Event, out OutputStream) {
 			t := evt.Topic()
 			assert.Contains(t, []string{"one", "two", "three"})
 			wg.Done()
@@ -42,9 +42,9 @@ func TestCellSimple(t *testing.T) {
 	}
 	c := newCell(ctx, "test", tb)
 
-	c.in.Append(NewEvent("one", nil))
-	c.in.Append(NewEvent("two", nil))
-	c.in.Append(NewEvent("three", nil))
+	c.in.Emit(NewEvent("one", nil))
+	c.in.Emit(NewEvent("two", nil))
+	c.in.Emit(NewEvent("three", nil))
 
 	wg.Wait()
 	cancel()
@@ -55,10 +55,10 @@ func TestCellSimple(t *testing.T) {
 //--------------------
 
 type testBehavior struct {
-	f func(evt *Event, out OutputQueue)
+	f func(evt *Event, out OutputStream)
 }
 
-func (tb *testBehavior) Go(ctx context.Context, name string, in InputQueue, out OutputQueue) {
+func (tb *testBehavior) Go(ctx context.Context, name string, in InputStream, out OutputStream) {
 	for {
 		select {
 		case <-ctx.Done():
