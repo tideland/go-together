@@ -18,6 +18,17 @@ import (
 )
 
 //--------------------
+// TOPICS
+//--------------------
+
+// Standard topics and keys.
+const (
+	TerminationTopic = "termination"
+
+	NameKey = "name"
+)
+
+//--------------------
 // COPYABLE
 //--------------------
 

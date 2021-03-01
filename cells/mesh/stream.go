@@ -13,9 +13,25 @@ package mesh
 
 import (
 	"errors"
-	"sync"
 	"time"
 )
+
+//--------------------
+// INPUT AND OUTPUT STREAMS
+//--------------------
+
+// InputStream provides a stream for reading events to process.
+type InputStream interface {
+	// Pull reads an event out of the stream.
+	Pull() <-chan *Event
+}
+
+// OutputStream provices a stream for emitting events
+// the subscribers have to process.
+type OutputStream interface {
+	// Emit appends an event to the end of all streams.
+	Emit(evt *Event) error
+}
 
 //--------------------
 // STREAM
@@ -56,62 +72,6 @@ func (str *stream) Emit(evt *Event) error {
 			}
 		}
 	}
-}
-
-// streams contains a number of streams to distribute events to.
-type streams struct {
-	mu      sync.RWMutex
-	streams map[*stream]struct{}
-}
-
-// newStreams creates a multi-stream instance.
-func newStreams() *streams {
-	return &streams{
-		streams: make(map[*stream]struct{}),
-	}
-}
-
-// add inserts the given stream to the streams.
-func (strs *streams) add(str *stream) {
-	strs.mu.Lock()
-	defer strs.mu.Unlock()
-	strs.streams[str] = struct{}{}
-}
-
-// remove deletes the given stream from the streams.
-func (strs *streams) remove(str *stream) {
-	strs.mu.Lock()
-	defer strs.mu.Unlock()
-	delete(strs.streams, str)
-}
-
-// Emit appends an event to the end of all streams.
-func (strs *streams) Emit(evt *Event) error {
-	strs.mu.RLock()
-	defer strs.mu.RUnlock()
-	for str := range strs.streams {
-		if err := str.Emit(evt); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-//--------------------
-// INPUT AND OUTPUT STREAMS
-//--------------------
-
-// InputStream provides a stream for reading events to process.
-type InputStream interface {
-	// Pull reads an event out of the stream.
-	Pull() <-chan *Event
-}
-
-// OutputStream provices a stream for emitting events
-// the subscribers have to process.
-type OutputStream interface {
-	// Emit appends an event to the end of all streams.
-	Emit(evt *Event) error
 }
 
 // EOF
