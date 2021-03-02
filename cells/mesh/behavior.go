@@ -32,32 +32,34 @@ type Behavior interface {
 // BEHAVIORS
 //--------------------
 
-// EventProcessingFunc defines a function signature for the simple
-// event processing behavior. This function processes every event.
-type EventProcessingFunc func(evt *Event, out OutputStream)
+// StatelessFunc defines a function signature for the stateless
+// behavior. This function processes an event by being called.
+type StatelessFunc func(evt *Event, out OutputStream) error
 
-// EventProcessingBehavior is a simple behavior using a function
+// StatelessBehavior is a simple behavior using a function
 // to process the received events.
-type EventProcessingBehavior struct {
-	epf EventProcessingFunc
+type StatelessBehavior struct {
+	sf StatelessFunc
 }
 
-// NewEventProcessingBehavior creates a behavior based on the given
+// NewStatelessBehavior creates a behavior based on the given
 // processing function.
-func NewEventProcessingBehavior(epf EventProcessingFunc) EventProcessingBehavior {
-	return EventProcessingBehavior{
-		epf: epf,
+func NewStatelessBehavior(sf StatelessFunc) StatelessBehavior {
+	return StatelessBehavior{
+		sf: sf,
 	}
 }
 
 // Go implements Behavior.
-func (epb EventProcessingBehavior) Go(ctx context.Context, name string, in InputStream, out OutputStream) {
+func (sb StatelessBehavior) Go(ctx context.Context, name string, in InputStream, out OutputStream) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case evt := <-in.Pull():
-			epb.epf(evt, out)
+			if err := sb.sf(evt, out); err != nil {
+				out.Emit(NewEvent(ErrorTopic, NameKey, name, MessageKey, err.Error()))
+			}
 		}
 	}
 }

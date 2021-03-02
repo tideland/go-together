@@ -13,6 +13,7 @@ package mesh
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -31,13 +32,14 @@ func TestCellSimple(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	topics := []string{}
 	sigc := make(chan interface{})
-	collector := func(evt *Event, out OutputStream) {
+	collector := func(evt *Event, out OutputStream) error {
 		topics = append(topics, evt.Topic())
 		if len(topics) == 3 {
 			close(sigc)
 		}
+		return nil
 	}
-	tbCollector := &testBehavior{f: collector}
+	tbCollector := NewStatelessBehavior(collector)
 	cCollector := newCell(ctx, "collector", tbCollector)
 
 	cCollector.in.Emit(NewEvent("one"))
@@ -58,22 +60,23 @@ func TestCellChain(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	topics := []string{}
 	sigc := make(chan interface{})
-	upcaser := func(evt *Event, out OutputStream) {
+	upcaser := func(evt *Event, out OutputStream) error {
 		upperTopic := strings.ToUpper(evt.Topic())
 		out.Emit(NewEvent(upperTopic))
+		return nil
 	}
-	tbUpcaser := &testBehavior{f: upcaser}
+	tbUpcaser := NewStatelessBehavior(upcaser)
 	cUpcaser := newCell(ctx, "upcaser", tbUpcaser)
-	collector := func(evt *Event, out OutputStream) {
+	collector := func(evt *Event, out OutputStream) error {
 		topics = append(topics, evt.Topic())
 		if len(topics) == 3 {
 			close(sigc)
 		}
+		return nil
 	}
-	tbCollector := &testBehavior{f: collector}
+	tbCollector := NewStatelessBehavior(collector)
 	cCollector := newCell(ctx, "collector", tbCollector)
-
-	cCollector.subscribe(cUpcaser)
+	cCollector.subscribeTo(cUpcaser)
 
 	cUpcaser.in.Emit(NewEvent("one"))
 	cUpcaser.in.Emit(NewEvent("two"))
@@ -86,23 +89,59 @@ func TestCellChain(t *testing.T) {
 	cancel()
 }
 
-//--------------------
-// HELPER
-//--------------------
+// TestCellAutoUnsubscribe verifies the automatic unsubscription
+// and information.
+func TestCellAutoUnsubscribe(t *testing.T) {
+	assert := asserts.NewTesting(t, asserts.FailStop)
+	ctx, cancel := context.WithCancel(context.Background())
+	events := []*Event{}
+	sigc := make(chan interface{})
+	forwarder := func(evt *Event, out OutputStream) error {
+		return out.Emit(evt)
+	}
+	cForwarderA := newCell(ctx, "forwarderA", NewStatelessBehavior(forwarder))
+	cForwarderB := newCell(ctx, "forwarderB", NewStatelessBehavior(forwarder))
+	failer := func(evt *Event, out OutputStream) error {
+		if evt.Topic() == "fail" {
+			msg, _ := evt.StringAt("message")
+			return errors.New(msg)
+		}
+		return out.Emit(evt)
+	}
+	cFailer := newCell(ctx, "failer", NewStatelessBehavior(failer))
+	cFailer.subscribeTo(cForwarderA)
+	cFailer.subscribeTo(cForwarderB)
+	collector := func(evt *Event, out OutputStream) error {
+		events = append(events, evt)
+		if evt.Topic() == ErrorTopic {
+			close(sigc)
+		}
+		return nil
+	}
+	cCollector := newCell(ctx, "collector", NewStatelessBehavior(collector))
+	cCollector.subscribeTo(cFailer)
 
-type testBehavior struct {
-	f func(evt *Event, out OutputStream)
-}
+	cForwarderA.in.Emit(NewEvent("foo"))
+	cForwarderB.in.Emit(NewEvent("bar"))
+	cForwarderA.in.Emit(NewEvent("fail", "message", "ouch"))
 
-func (tb *testBehavior) Go(ctx context.Context, name string, in InputStream, out OutputStream) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case evt := <-in.Pull():
-			tb.f(evt, out)
+	assert.WaitClosed(sigc, time.Second)
+	cForwarderA.in.Emit(NewEvent("dont-care"))
+	cForwarderB.in.Emit(NewEvent("dont-care"))
+
+	i := len(events)
+	assert.True(i < 4)
+	for i = 0; i < len(events); i++ {
+		if events[i].Topic() == ErrorTopic {
+			break
 		}
 	}
+	name, _ := events[i].StringAt(NameKey)
+	assert.Equal(name, "failer")
+	message, _ := events[i].StringAt(MessageKey)
+	assert.Equal(message, "ouch")
+
+	cancel()
 }
 
 // EOF

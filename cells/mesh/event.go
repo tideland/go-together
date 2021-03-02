@@ -23,9 +23,11 @@ import (
 
 // Standard topics and keys.
 const (
+	ErrorTopic       = "error"
 	TerminationTopic = "termination"
 
-	NameKey = "name"
+	MessageKey = "messgae"
+	NameKey    = "name"
 )
 
 //--------------------
