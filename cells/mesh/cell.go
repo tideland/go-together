@@ -43,9 +43,9 @@ func newCell(ctx context.Context, name string, b Behavior) *cell {
 	return c
 }
 
-// subscribe adds the in queue of this cell to the out cells of the
+// subscribeTo adds the in queue of this cell to the out cells of the
 // given cell.
-func (c *cell) subscribe(sc *cell) {
+func (c *cell) subscribeTo(sc *cell) {
 	c.subscribedTo.add(sc)
 	sc.out.add(c)
 }

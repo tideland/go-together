@@ -61,7 +61,7 @@ func (m *Mesh) Subscribe(fromName, toName string) error {
 	if toCell == nil {
 		return fmt.Errorf("to cell %q does not exist", toName)
 	}
-	fromCell.subscribe(toCell)
+	fromCell.subscribeTo(toCell)
 	return nil
 }
 
