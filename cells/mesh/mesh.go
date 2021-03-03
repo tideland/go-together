@@ -65,8 +65,25 @@ func (m *Mesh) Subscribe(fromName, toName string) error {
 	return nil
 }
 
-// Raise appends an event to the in-queue of a cell.
-func (m *Mesh) Raise(name string, evt *Event) error {
+// Unsubscribe unsubscribes the cell with to name from the cell
+// with from name.
+func (m *Mesh) Unsubscribe(toName, fromName string) error {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	toCell := m.cells[toName]
+	fromCell := m.cells[fromName]
+	if toCell == nil {
+		return fmt.Errorf("to cell %q does not exist", toName)
+	}
+	if fromCell == nil {
+		return fmt.Errorf("from cell %q does not exist", fromName)
+	}
+	toCell.unsubscribeFrom(fromCell)
+	return nil
+}
+
+// Emit raises an event to the named cell.
+func (m *Mesh) Emit(name string, evt *Event) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	raiseCell := m.cells[name]

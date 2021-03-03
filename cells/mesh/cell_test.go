@@ -86,6 +86,15 @@ func TestCellChain(t *testing.T) {
 	assert.Length(topics, 3)
 	assert.Equal(strings.Join(topics, " "), "ONE TWO THREE")
 
+	cCollector.unsubscribeFrom(cUpcaser)
+
+	cUpcaser.in.Emit(NewEvent("FOUR"))
+	cUpcaser.in.Emit(NewEvent("FIVE"))
+	cUpcaser.in.Emit(NewEvent("SIX"))
+
+	assert.Length(topics, 3)
+	assert.Equal(strings.Join(topics, " "), "ONE TWO THREE")
+
 	cancel()
 }
 

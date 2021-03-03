@@ -43,11 +43,18 @@ func newCell(ctx context.Context, name string, b Behavior) *cell {
 	return c
 }
 
-// subscribeTo adds the in queue of this cell to the out cells of the
-// given cell.
-func (c *cell) subscribeTo(sc *cell) {
-	c.subscribedTo.add(sc)
-	sc.out.add(c)
+// subscribeTo adds the cell to the out stream of the
+// given to cell.
+func (c *cell) subscribeTo(toCell *cell) {
+	c.subscribedTo.add(toCell)
+	toCell.out.add(c)
+}
+
+// unsubscribeFrom removes the cell from the out stream of the
+// given from cell.
+func (c *cell) unsubscribeFrom(fromCell *cell) {
+	c.subscribedTo.remove(fromCell)
+	fromCell.out.remove(c)
 }
 
 // unsubscribeAll removes the subscription from all cells this
