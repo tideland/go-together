@@ -112,8 +112,14 @@ func (m *Mesh) Emitter(name string) (*Emitter, error) {
 	if emitCell == nil {
 		return nil, fmt.Errorf("cell %q does not exist", name)
 	}
-	m.emitter[name] = (*Emitter)(emitCell.in)
-	return m.emitter[name], nil
+	emitter := m.emitter[name]
+	if emitter == nil {
+		emitter = &Emitter{
+			strean: emitCell.in,
+		}
+		m.emitter[name] = emitter
+	}
+	return emitter, nil
 }
 
 // EOF
