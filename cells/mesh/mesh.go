@@ -23,16 +23,18 @@ import (
 
 // Mesh manages a closed network of cells.
 type Mesh struct {
-	mu    sync.RWMutex
-	ctx   context.Context
-	cells map[string]*cell
+	mu      sync.RWMutex
+	ctx     context.Context
+	cells   map[string]*cell
+	emitter map[string]*Emitter
 }
 
 // New creates new Mesh instance.
 func New(ctx context.Context) *Mesh {
 	m := &Mesh{
-		ctx:   ctx,
-		cells: make(map[string]*cell),
+		ctx:     ctx,
+		cells:   make(map[string]*cell),
+		emitter: make(map[string]*Emitter),
 	}
 	return m
 }
@@ -44,8 +46,17 @@ func (m *Mesh) Go(name string, b Behavior) error {
 	if m.cells[name] != nil {
 		return fmt.Errorf("cell name %q already used", name)
 	}
-	m.cells[name] = newCell(m.ctx, name, b)
+	m.cells[name] = newCell(m.ctx, m, name, b)
 	return nil
+}
+
+// drop removes a cell and only can be done by itself
+// notifying the mesh that it ends its work.
+func (m *Mesh) drop(name string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.cells, name)
+	delete(m.emitter, name)
 }
 
 // Subscribe subscribes the cell with from name to the cell
@@ -86,11 +97,23 @@ func (m *Mesh) Unsubscribe(toName, fromName string) error {
 func (m *Mesh) Emit(name string, evt *Event) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	raiseCell := m.cells[name]
-	if raiseCell == nil {
+	emitCell := m.cells[name]
+	if emitCell == nil {
 		return fmt.Errorf("cell %q does not exist", name)
 	}
-	return raiseCell.in.Emit(evt)
+	return emitCell.in.Emit(evt)
+}
+
+// Emitter returns a static emitter for the named cell.
+func (m *Mesh) Emitter(name string) (*Emitter, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	emitCell := m.cells[name]
+	if emitCell == nil {
+		return nil, fmt.Errorf("cell %q does not exist", name)
+	}
+	m.emitter[name] = (*Emitter)(emitCell.in)
+	return m.emitter[name], nil
 }
 
 // EOF

@@ -13,7 +13,18 @@ package mesh
 
 import (
 	"context"
+	"sync"
 )
+
+//--------------------
+// OWNER
+//--------------------
+
+// owner defines the interface of the cell owning instance.
+type owner interface {
+	// drop notifies that the cell stops working.
+	drop(name string)
+}
 
 //--------------------
 // CELL
@@ -21,55 +32,67 @@ import (
 
 // cell runs a behevior networked with other cells.
 type cell struct {
-	ctx          context.Context
-	name         string
-	behavior     Behavior
-	subscribedTo *registry
-	in           *stream
-	out          *registry
+	mu       sync.RWMutex
+	ctx      context.Context
+	owner    owner
+	name     string
+	behavior Behavior
+	in       *stream
+	inCells  map[*cell]struct{}
+	out      *streams
 }
 
 // newCell starts a new cell working in the background.
-func newCell(ctx context.Context, name string, b Behavior) *cell {
+func newCell(ctx context.Context, owner owner, name string, b Behavior) *cell {
 	c := &cell{
-		ctx:          ctx,
-		name:         name,
-		behavior:     b,
-		subscribedTo: newRegistry(),
-		in:           newStream(16),
-		out:          newRegistry(),
+		ctx:      ctx,
+		owner:    owner,
+		name:     name,
+		behavior: b,
+		in:       newStream(16),
+		inCells:  make(map[*cell]struct{}),
+		out:      newStreams(),
 	}
 	go c.backend()
 	return c
 }
 
-// subscribeTo adds the cell to the out stream of the
-// given to cell.
-func (c *cell) subscribeTo(toCell *cell) {
-	c.subscribedTo.add(toCell)
-	toCell.out.add(c)
+// subscribeTo adds the cell to the out-streams of the
+// given in-cell.
+func (c *cell) subscribeTo(inCell *cell) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	inCell.out.add(c.in)
+	c.inCells[inCell] = struct{}{}
 }
 
-// unsubscribeFrom removes the cell from the out stream of the
-// given from cell.
-func (c *cell) unsubscribeFrom(fromCell *cell) {
-	c.subscribedTo.remove(fromCell)
-	fromCell.out.remove(c)
+// unsubscribeFrom removes the cell from the out-streams of the
+// given in-cell.
+func (c *cell) unsubscribeFrom(inCell *cell) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	inCell.out.remove(c.in)
+	delete(c.inCells, inCell)
 }
 
-// unsubscribeAll removes the subscription from all cells this
+// unsubscribeFromAll removes the subscription from all cells this
 // one subscribed to.
-func (c *cell) unsubscribeAll() {
-	c.subscribedTo.removeAll(c)
+func (c *cell) unsubscribFromeAll() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for inCell := range c.inCells {
+		inCell.out.remove(c.in)
+	}
 }
 
 // backend runs as goroutine and cares for the behavior. When it ends
-// then all subscriptions are unsubscribed and subscribers get a
-// notification.
+// it will send a notification to all subscribers, unsubscribe from
+// them, and then tell the mesh that it's not available anymore.
 func (c *cell) backend() {
 	defer func() {
-		c.unsubscribeAll()
 		c.out.Emit(NewEvent(TerminationTopic, NameKey, c.name))
+		c.unsubscribFromeAll()
+		c.owner.drop(c.name)
 	}()
 	c.behavior.Go(c.ctx, c.name, c.in, c.out)
 }

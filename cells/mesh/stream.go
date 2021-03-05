@@ -13,6 +13,7 @@ package mesh
 
 import (
 	"errors"
+	"sync"
 	"time"
 )
 
@@ -72,6 +73,57 @@ func (str *stream) Emit(evt *Event) error {
 			}
 		}
 	}
+}
+
+//--------------------
+// STREAMS
+//--------------------
+
+// streams is a set of streans to emit to multiple
+// streams at once.
+type streams struct {
+	mu      sync.RWMutex
+	streams map[*stream]struct{}
+}
+
+// newStreams creates an empty set of streams.
+func newStreams() *streams {
+	return &streams{
+		streams: make(map[*stream]struct{}),
+	}
+}
+
+// add add a stream to the set of streams.
+func (s *streams) add(as *stream) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.streams[as] = struct{}{}
+}
+
+// remove deletes a stream from the set of streams.
+func (s *streams) remove(rs *stream) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.streams, rs)
+}
+
+// removeAll deletes all streams from the set of streams.
+func (s *streams) removeAll() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.streams = make(map[*stream]struct{})
+}
+
+// Emit implements OutputStream emitting an event to all streams.
+func (s *streams) Emit(evt *Event) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for es := range s.streams {
+		if err := es.Emit(evt); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // EOF
