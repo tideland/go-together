@@ -18,19 +18,19 @@ import (
 )
 
 //--------------------
-// INPUT AND OUTPUT STREAMS
+// INTERFACES
 //--------------------
 
-// InputStream provides a stream for reading events to process.
-type InputStream interface {
-	// Pull reads an event out of the stream.
+// Receptor defines the interface to receive events.
+type Receptor interface {
+	// Pull reads an event out of the input stream.
 	Pull() <-chan *Event
 }
 
-// OutputStream provices a stream for emitting events
-// the subscribers have to process.
-type OutputStream interface {
-	// Emit appends an event to the end of all streams.
+// Emitter defines the interface for emitting events to one
+// or more cells.
+type Emitter interface {
+	// Emit appends an event to the end of the output stream.
 	Emit(evt *Event) error
 }
 
@@ -114,7 +114,8 @@ func (s *streams) removeAll() {
 	s.streams = make(map[*stream]struct{})
 }
 
-// Emit implements OutputStream emitting an event to all streams.
+// Emit appends the given event to the end of all contained
+// streams.
 func (s *streams) Emit(evt *Event) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

@@ -97,11 +97,15 @@ func (c *cell) unsubscribFromeAll() {
 // them, and then tell the mesh that it's not available anymore.
 func (c *cell) backend() {
 	defer func() {
+		// Notify, unsubscribe, and drop.
 		c.out.Emit(NewEvent(TerminationTopic, NameKey, c.name))
 		c.unsubscribFromeAll()
 		c.drop()
 	}()
-	c.behavior.Go(c, c.in, c.out)
+	if err := c.behavior.Go(c, c.in, c.out); err != nil {
+		// Notify subscribers about error.
+		c.out.Emit(NewEvent(ErrorTopic, NameKey, c.name, MessageKey, err.Error()))
+	}
 }
 
 // EOF

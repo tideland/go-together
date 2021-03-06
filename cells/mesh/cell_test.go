@@ -32,14 +32,14 @@ func TestCellSimple(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	topics := []string{}
 	sigc := make(chan interface{})
-	collector := func(evt *Event, out OutputStream) error {
+	collector := func(cell Cell, evt *Event, out Emitter) error {
 		topics = append(topics, evt.Topic())
 		if len(topics) == 3 {
 			close(sigc)
 		}
 		return nil
 	}
-	tbCollector := NewStatelessBehavior(collector)
+	tbCollector := NewRequestBehavior(collector)
 	cCollector := newCell(ctx, "collector", meshStub{}, tbCollector, drop)
 
 	cCollector.in.Emit(NewEvent("one"))
@@ -60,21 +60,21 @@ func TestCellChain(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	topics := []string{}
 	sigc := make(chan interface{})
-	upcaser := func(evt *Event, out OutputStream) error {
+	upcaser := func(cell Cell, evt *Event, out Emitter) error {
 		upperTopic := strings.ToUpper(evt.Topic())
 		out.Emit(NewEvent(upperTopic))
 		return nil
 	}
-	tbUpcaser := NewStatelessBehavior(upcaser)
+	tbUpcaser := NewRequestBehavior(upcaser)
 	cUpcaser := newCell(ctx, "upcaser", meshStub{}, tbUpcaser, drop)
-	collector := func(evt *Event, out OutputStream) error {
+	collector := func(cell Cell, evt *Event, out Emitter) error {
 		topics = append(topics, evt.Topic())
 		if len(topics) == 3 {
 			close(sigc)
 		}
 		return nil
 	}
-	tbCollector := NewStatelessBehavior(collector)
+	tbCollector := NewRequestBehavior(collector)
 	cCollector := newCell(ctx, "collector", meshStub{}, tbCollector, drop)
 	cCollector.subscribeTo(cUpcaser)
 
@@ -105,29 +105,29 @@ func TestCellAutoUnsubscribe(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	events := []*Event{}
 	sigc := make(chan interface{})
-	forwarder := func(evt *Event, out OutputStream) error {
+	forwarder := func(cell Cell, evt *Event, out Emitter) error {
 		return out.Emit(evt)
 	}
-	cForwarderA := newCell(ctx, "forwarderA", meshStub{}, NewStatelessBehavior(forwarder), drop)
-	cForwarderB := newCell(ctx, "forwarderB", meshStub{}, NewStatelessBehavior(forwarder), drop)
-	failer := func(evt *Event, out OutputStream) error {
+	cForwarderA := newCell(ctx, "forwarderA", meshStub{}, NewRequestBehavior(forwarder), drop)
+	cForwarderB := newCell(ctx, "forwarderB", meshStub{}, NewRequestBehavior(forwarder), drop)
+	failer := func(cell Cell, evt *Event, out Emitter) error {
 		if evt.Topic() == "fail" {
 			msg, _ := evt.StringAt("message")
 			return errors.New(msg)
 		}
 		return out.Emit(evt)
 	}
-	cFailer := newCell(ctx, "failer", meshStub{}, NewStatelessBehavior(failer), drop)
+	cFailer := newCell(ctx, "failer", meshStub{}, NewRequestBehavior(failer), drop)
 	cFailer.subscribeTo(cForwarderA)
 	cFailer.subscribeTo(cForwarderB)
-	collector := func(evt *Event, out OutputStream) error {
+	collector := func(cell Cell, evt *Event, out Emitter) error {
 		events = append(events, evt)
 		if evt.Topic() == ErrorTopic {
 			close(sigc)
 		}
 		return nil
 	}
-	cCollector := newCell(ctx, "collector", meshStub{}, NewStatelessBehavior(collector), drop)
+	cCollector := newCell(ctx, "collector", meshStub{}, NewRequestBehavior(collector), drop)
 	cCollector.subscribeTo(cFailer)
 
 	cForwarderA.in.Emit(NewEvent("foo"))
@@ -176,7 +176,7 @@ func (ms meshStub) Emit(name string, evt *Event) error {
 	return nil
 }
 
-func (ms meshStub) Emitter(name string) (*Emitter, error) {
+func (ms meshStub) Emitter(name string) (Emitter, error) {
 	return nil, nil
 }
 

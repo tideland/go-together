@@ -37,7 +37,7 @@ type Mesh interface {
 	Emit(name string, evt *Event) error
 
 	// Emitter returns a static emitter for the named cell.
-	Emitter(name string) (*Emitter, error)
+	Emitter(name string) (Emitter, error)
 }
 
 //--------------------
@@ -68,40 +68,51 @@ type Behavior interface {
 	// of the implementation to run a select loop, receive incomming
 	// events via the input queue, and emit events via the output queue
 	// if needed.
-	Go(cell Cell, in InputStream, out OutputStream)
+	Go(cell Cell, in Receptor, out Emitter) error
 }
 
 //--------------------
 // BEHAVIORS
 //--------------------
 
-// StatelessFunc defines a function signature for the stateless
-// behavior. This function processes an event by being called.
-type StatelessFunc func(evt *Event, out OutputStream) error
+// BehaviorFunc simplifies implementation of a behavior when only
+// one function is needed. It can be deployed via
+//
+//     myMesh.Go("my-name", BehaviorFunc(myFunc))
+type BehaviorFunc func(cell Cell, in Receptor, out Emitter) error
 
-// StatelessBehavior is a simple behavior using a function
-// to process the received events.
-type StatelessBehavior struct {
-	sf StatelessFunc
+// Go implements Behavior.
+func (bf BehaviorFunc) Go(cell Cell, in Receptor, out Emitter) error {
+	return bf(cell, in, out)
 }
 
-// NewStatelessBehavior creates a behavior based on the given
+// RequestFunc defines a function signature for the request
+// behavior. It is called per received event.
+type RequestFunc func(cell Cell, evt *Event, out Emitter) error
+
+// RequestBehavior is a simple behavior using a function
+// to process the received events.
+type RequestBehavior struct {
+	rf RequestFunc
+}
+
+// NewRequestBehavior creates a behavior based on the given
 // processing function.
-func NewStatelessBehavior(sf StatelessFunc) StatelessBehavior {
-	return StatelessBehavior{
-		sf: sf,
+func NewRequestBehavior(rf RequestFunc) RequestBehavior {
+	return RequestBehavior{
+		rf: rf,
 	}
 }
 
 // Go implements Behavior.
-func (sb StatelessBehavior) Go(cell Cell, in InputStream, out OutputStream) {
+func (rb RequestBehavior) Go(cell Cell, in Receptor, out Emitter) error {
 	for {
 		select {
 		case <-cell.Context().Done():
-			return
+			return nil
 		case evt := <-in.Pull():
-			if err := sb.sf(evt, out); err != nil {
-				out.Emit(NewEvent(ErrorTopic, NameKey, cell.Name(), MessageKey, err.Error()))
+			if err := rb.rf(cell, evt, out); err != nil {
+				return err
 			}
 		}
 	}

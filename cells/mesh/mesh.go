@@ -24,18 +24,18 @@ import (
 // mesh manages a closed network of cells. It implements
 // the Mesh interface.
 type mesh struct {
-	mu      sync.RWMutex
-	ctx     context.Context
-	cells   map[string]*cell
-	emitter map[string]*Emitter
+	mu       sync.RWMutex
+	ctx      context.Context
+	cells    map[string]*cell
+	emitters map[string]*emitter
 }
 
 // New creates new Mesh instance.
 func New(ctx context.Context) Mesh {
 	m := &mesh{
-		ctx:     ctx,
-		cells:   make(map[string]*cell),
-		emitter: make(map[string]*Emitter),
+		ctx:      ctx,
+		cells:    make(map[string]*cell),
+		emitters: make(map[string]*emitter),
 	}
 	return m
 }
@@ -52,7 +52,7 @@ func (m *mesh) Go(name string, b Behavior) error {
 		m.mu.Lock()
 		defer m.mu.Unlock()
 		delete(m.cells, name)
-		delete(m.emitter, name)
+		delete(m.emitters, name)
 	})
 	return nil
 }
@@ -101,21 +101,21 @@ func (m *mesh) Emit(name string, evt *Event) error {
 }
 
 // Emitter implements Mesh.
-func (m *mesh) Emitter(name string) (*Emitter, error) {
+func (m *mesh) Emitter(name string) (Emitter, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	emitCell := m.cells[name]
 	if emitCell == nil {
 		return nil, fmt.Errorf("cell %q does not exist", name)
 	}
-	emitter := m.emitter[name]
-	if emitter == nil {
-		emitter = &Emitter{
+	namedEmitter := m.emitters[name]
+	if namedEmitter == nil {
+		namedEmitter = &emitter{
 			strean: emitCell.in,
 		}
-		m.emitter[name] = emitter
+		m.emitters[name] = namedEmitter
 	}
-	return emitter, nil
+	return namedEmitter, nil
 }
 
 // EOF

@@ -17,14 +17,14 @@ import ()
 // EMITTER
 //--------------------
 
-// Emitter allows the continuous emitting of events to a cell
+// emitter allows the continuous emitting of events to a cell
 // without having to resolve the cell name each time.
-type Emitter struct {
+type emitter struct {
 	strean *stream
 }
 
-// Emit implements OutputStream.
-func (e *Emitter) Emit(evt *Event) error {
+// Emit implements Emitter.
+func (e *emitter) Emit(evt *Event) error {
 	return e.strean.Emit(evt)
 }
 
