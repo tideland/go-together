@@ -40,7 +40,7 @@ func TestCellSimple(t *testing.T) {
 		return nil
 	}
 	tbCollector := NewStatelessBehavior(collector)
-	cCollector := newCell(ctx, ownerStub{}, "collector", tbCollector)
+	cCollector := newCell(ctx, "collector", meshStub{}, tbCollector, drop)
 
 	cCollector.in.Emit(NewEvent("one"))
 	cCollector.in.Emit(NewEvent("two"))
@@ -66,7 +66,7 @@ func TestCellChain(t *testing.T) {
 		return nil
 	}
 	tbUpcaser := NewStatelessBehavior(upcaser)
-	cUpcaser := newCell(ctx, ownerStub{}, "upcaser", tbUpcaser)
+	cUpcaser := newCell(ctx, "upcaser", meshStub{}, tbUpcaser, drop)
 	collector := func(evt *Event, out OutputStream) error {
 		topics = append(topics, evt.Topic())
 		if len(topics) == 3 {
@@ -75,7 +75,7 @@ func TestCellChain(t *testing.T) {
 		return nil
 	}
 	tbCollector := NewStatelessBehavior(collector)
-	cCollector := newCell(ctx, ownerStub{}, "collector", tbCollector)
+	cCollector := newCell(ctx, "collector", meshStub{}, tbCollector, drop)
 	cCollector.subscribeTo(cUpcaser)
 
 	cUpcaser.in.Emit(NewEvent("one"))
@@ -108,8 +108,8 @@ func TestCellAutoUnsubscribe(t *testing.T) {
 	forwarder := func(evt *Event, out OutputStream) error {
 		return out.Emit(evt)
 	}
-	cForwarderA := newCell(ctx, ownerStub{}, "forwarderA", NewStatelessBehavior(forwarder))
-	cForwarderB := newCell(ctx, ownerStub{}, "forwarderB", NewStatelessBehavior(forwarder))
+	cForwarderA := newCell(ctx, "forwarderA", meshStub{}, NewStatelessBehavior(forwarder), drop)
+	cForwarderB := newCell(ctx, "forwarderB", meshStub{}, NewStatelessBehavior(forwarder), drop)
 	failer := func(evt *Event, out OutputStream) error {
 		if evt.Topic() == "fail" {
 			msg, _ := evt.StringAt("message")
@@ -117,7 +117,7 @@ func TestCellAutoUnsubscribe(t *testing.T) {
 		}
 		return out.Emit(evt)
 	}
-	cFailer := newCell(ctx, ownerStub{}, "failer", NewStatelessBehavior(failer))
+	cFailer := newCell(ctx, "failer", meshStub{}, NewStatelessBehavior(failer), drop)
 	cFailer.subscribeTo(cForwarderA)
 	cFailer.subscribeTo(cForwarderB)
 	collector := func(evt *Event, out OutputStream) error {
@@ -127,7 +127,7 @@ func TestCellAutoUnsubscribe(t *testing.T) {
 		}
 		return nil
 	}
-	cCollector := newCell(ctx, ownerStub{}, "collector", NewStatelessBehavior(collector))
+	cCollector := newCell(ctx, "collector", meshStub{}, NewStatelessBehavior(collector), drop)
 	cCollector.subscribeTo(cFailer)
 
 	cForwarderA.in.Emit(NewEvent("foo"))
@@ -157,9 +157,31 @@ func TestCellAutoUnsubscribe(t *testing.T) {
 // STUBS
 //--------------------
 
-// ownerStub simulates the mesh.
-type ownerStub struct{}
+// meshStub simulates the mesh for the cells.
+type meshStub struct{}
 
-func (d ownerStub) drop(name string) {}
+func (ms meshStub) Go(name string, b Behavior) error {
+	return nil
+}
+
+func (ms meshStub) Subscribe(fromName, toName string) error {
+	return nil
+}
+
+func (ms meshStub) Unsubscribe(toName, fromName string) error {
+	return nil
+}
+
+func (ms meshStub) Emit(name string, evt *Event) error {
+	return nil
+}
+
+func (ms meshStub) Emitter(name string) (*Emitter, error) {
+	return nil, nil
+}
+
+// drop simulates the callback to notify the
+// mesh of the termination of a cell.
+var drop = func() {}
 
 // EOF

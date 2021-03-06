@@ -17,16 +17,6 @@ import (
 )
 
 //--------------------
-// OWNER
-//--------------------
-
-// owner defines the interface of the cell owning instance.
-type owner interface {
-	// drop notifies that the cell stops working.
-	drop(name string)
-}
-
-//--------------------
 // CELL
 //--------------------
 
@@ -34,27 +24,44 @@ type owner interface {
 type cell struct {
 	mu       sync.RWMutex
 	ctx      context.Context
-	owner    owner
 	name     string
+	mesh     Mesh
 	behavior Behavior
 	in       *stream
 	inCells  map[*cell]struct{}
 	out      *streams
+	drop     func()
 }
 
 // newCell starts a new cell working in the background.
-func newCell(ctx context.Context, owner owner, name string, b Behavior) *cell {
+func newCell(ctx context.Context, name string, m Mesh, b Behavior, drop func()) *cell {
 	c := &cell{
 		ctx:      ctx,
-		owner:    owner,
 		name:     name,
+		mesh:     m,
 		behavior: b,
 		in:       newStream(16),
 		inCells:  make(map[*cell]struct{}),
 		out:      newStreams(),
+		drop:     drop,
 	}
 	go c.backend()
 	return c
+}
+
+// Context implements Cell.
+func (c *cell) Context() context.Context {
+	return c.ctx
+}
+
+// Name implements Cell.
+func (c *cell) Name() string {
+	return c.name
+}
+
+// Mesh implements Cell.
+func (c *cell) Mesh() Mesh {
+	return nil
 }
 
 // subscribeTo adds the cell to the out-streams of the
@@ -92,9 +99,9 @@ func (c *cell) backend() {
 	defer func() {
 		c.out.Emit(NewEvent(TerminationTopic, NameKey, c.name))
 		c.unsubscribFromeAll()
-		c.owner.drop(c.name)
+		c.drop()
 	}()
-	c.behavior.Go(c.ctx, c.name, c.in, c.out)
+	c.behavior.Go(c, c.in, c.out)
 }
 
 // EOF

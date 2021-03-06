@@ -16,6 +16,49 @@ import (
 )
 
 //--------------------
+// MESH
+//--------------------
+
+// Mesh describes the interface to a mesh of a cell from the
+// perspective of a behavior.
+type Mesh interface {
+	// Go starts a cell using the given behavior.
+	Go(name string, b Behavior) error
+
+	// Subscribe subscribes the cell with from name to the cell
+	// with to name.
+	Subscribe(fromName, toName string) error
+
+	// Unsubscribe unsubscribes the cell with to name from the cell
+	// with from name.
+	Unsubscribe(toName, fromName string) error
+
+	// Emit raises an event to the named cell.
+	Emit(name string, evt *Event) error
+
+	// Emitter returns a static emitter for the named cell.
+	Emitter(name string) (*Emitter, error)
+}
+
+//--------------------
+// CELL
+//--------------------
+
+// Cell describes the interface to a cell from the perspective
+// of a behavior.
+type Cell interface {
+	// Context returns the context of mesh and cell.
+	Context() context.Context
+
+	// Name returns the name of the deployed cell running the
+	// behavior.
+	Name() string
+
+	// Mesh returns the mesh of the cell.
+	Mesh() Mesh
+}
+
+//--------------------
 // BEHAVIOR
 //--------------------
 
@@ -25,7 +68,7 @@ type Behavior interface {
 	// of the implementation to run a select loop, receive incomming
 	// events via the input queue, and emit events via the output queue
 	// if needed.
-	Go(ctx context.Context, name string, in InputStream, out OutputStream)
+	Go(cell Cell, in InputStream, out OutputStream)
 }
 
 //--------------------
@@ -51,14 +94,14 @@ func NewStatelessBehavior(sf StatelessFunc) StatelessBehavior {
 }
 
 // Go implements Behavior.
-func (sb StatelessBehavior) Go(ctx context.Context, name string, in InputStream, out OutputStream) {
+func (sb StatelessBehavior) Go(cell Cell, in InputStream, out OutputStream) {
 	for {
 		select {
-		case <-ctx.Done():
+		case <-cell.Context().Done():
 			return
 		case evt := <-in.Pull():
 			if err := sb.sf(evt, out); err != nil {
-				out.Emit(NewEvent(ErrorTopic, NameKey, name, MessageKey, err.Error()))
+				out.Emit(NewEvent(ErrorTopic, NameKey, cell.Name(), MessageKey, err.Error()))
 			}
 		}
 	}
