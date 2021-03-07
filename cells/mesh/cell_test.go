@@ -122,7 +122,7 @@ func TestCellAutoUnsubscribe(t *testing.T) {
 	cFailer.subscribeTo(cForwarderB)
 	collector := func(cell Cell, evt *Event, out Emitter) error {
 		events = append(events, evt)
-		if evt.Topic() == ErrorTopic {
+		if len(events) == 3 {
 			close(sigc)
 		}
 		return nil
@@ -138,18 +138,20 @@ func TestCellAutoUnsubscribe(t *testing.T) {
 	cForwarderA.in.Emit(NewEvent("dont-care"))
 	cForwarderB.in.Emit(NewEvent("dont-care"))
 
-	i := len(events)
-	assert.True(i < 4)
-	for i = 0; i < len(events); i++ {
-		if events[i].Topic() == ErrorTopic {
+	foundc := make(chan interface{})
+
+	for _, event := range events {
+		if event.Topic() == ErrorTopic {
+			name, _ := event.StringAt(NameKey)
+			assert.Equal(name, "failer")
+			message, _ := event.StringAt(MessageKey)
+			assert.Equal(message, "ouch")
+			close(foundc)
 			break
 		}
 	}
-	name, _ := events[i].StringAt(NameKey)
-	assert.Equal(name, "failer")
-	message, _ := events[i].StringAt(MessageKey)
-	assert.Equal(message, "ouch")
 
+	assert.WaitClosed(foundc, time.Second, "error not found")
 	cancel()
 }
 
