@@ -40,15 +40,47 @@ func TestMeshGo(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	ctx, cancel := context.WithCancel(context.Background())
 	sigc := make(chan interface{})
-	behavior := func(cell mesh.Cell, in mesh.Receptor, out mesh.Emitter) error {
+	behaviorFunc := func(cell mesh.Cell, in mesh.Receptor, out mesh.Emitter) error {
 		sigc <- cell.Name()
 		return nil
 	}
 	msh := mesh.New(ctx)
 
-	msh.Go("testing", mesh.BehaviorFunc(behavior))
+	msh.Go("testing", mesh.BehaviorFunc(behaviorFunc))
 
 	assert.Wait(sigc, "testing", time.Second)
+
+	cancel()
+}
+
+// TestMeshEmit verifies the emitting of events to one cell.
+func TestMeshEmit(t *testing.T) {
+	assert := asserts.NewTesting(t, asserts.FailStop)
+	ctx, cancel := context.WithCancel(context.Background())
+	sigc := make(chan interface{})
+	behaviorFunc := func(cell mesh.Cell, in mesh.Receptor, out mesh.Emitter) error {
+		i := 0
+		for {
+			select {
+			case <-cell.Context().Done():
+				return nil
+			case evt := <-in.Pull():
+				i++
+				if evt.Topic() == "get-i" {
+					sigc <- i
+				}
+			}
+		}
+	}
+	msh := mesh.New(ctx)
+
+	msh.Go("testing", mesh.BehaviorFunc(behaviorFunc))
+	msh.Emit("testing", mesh.NewEvent("one"))
+	msh.Emit("testing", mesh.NewEvent("two"))
+	msh.Emit("testing", mesh.NewEvent("three"))
+	msh.Emit("testing", mesh.NewEvent("get-i"))
+
+	assert.Wait(sigc, 4, time.Second)
 
 	cancel()
 }
