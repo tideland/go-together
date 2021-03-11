@@ -43,10 +43,10 @@ type stream struct {
 	eventc chan *Event
 }
 
-// newStream creates a stream instance with the given buffer size.
-func newStream(size int) *stream {
+// newStream creates a stream instance.
+func newStream() *stream {
 	return &stream{
-		eventc: make(chan *Event, size),
+		eventc: make(chan *Event),
 	}
 }
 
@@ -60,14 +60,14 @@ func (str *stream) Pull() <-chan *Event {
 // increase. If it lasts too long, about 5 seconds, a timeout
 // error will be returned.
 func (str *stream) Emit(evt *Event) error {
-	wait := 75 * time.Millisecond
+	wait := 50 * time.Millisecond
 	for {
 		select {
 		case str.eventc <- evt:
 			return nil
 		default:
 			time.Sleep(wait)
-			wait *= 2
+			wait += 50 * time.Millisecond
 			if wait > 5*time.Second {
 				return errors.New("timeout")
 			}

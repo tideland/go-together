@@ -28,7 +28,7 @@ import (
 func TestStreamSimple(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	ctx, cancel := context.WithCancel(context.Background())
-	str := newStream(16)
+	str := newStream()
 	topics := []string{"one", "two", "three", "four", "five"}
 
 	var wg sync.WaitGroup

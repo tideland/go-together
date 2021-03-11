@@ -40,7 +40,7 @@ func newCell(ctx context.Context, name string, m Mesh, b Behavior, drop func()) 
 		name:     name,
 		mesh:     m,
 		behavior: b,
-		in:       newStream(16),
+		in:       newStream(),
 		inCells:  make(map[*cell]struct{}),
 		out:      newStreams(),
 		drop:     drop,
