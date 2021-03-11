@@ -73,12 +73,54 @@ func TestMeshEmit(t *testing.T) {
 		}
 	}
 	msh := mesh.New(ctx)
+	err := msh.Emit("testing", mesh.NewEvent("one"))
+	assert.ErrorContains(err, "cell \"testing\" does not exist")
 
 	msh.Go("testing", mesh.BehaviorFunc(behaviorFunc))
-	msh.Emit("testing", mesh.NewEvent("one"))
+
+	err = msh.Emit("testing", mesh.NewEvent("one"))
+	assert.NoError(err)
+
 	msh.Emit("testing", mesh.NewEvent("two"))
 	msh.Emit("testing", mesh.NewEvent("three"))
 	msh.Emit("testing", mesh.NewEvent("get-i"))
+
+	assert.Wait(sigc, 4, time.Second)
+
+	cancel()
+}
+
+// TestMeshEmitter verifies the emitting of events to one cell using an emitter.
+func TestMeshEmitter(t *testing.T) {
+	assert := asserts.NewTesting(t, asserts.FailStop)
+	ctx, cancel := context.WithCancel(context.Background())
+	sigc := make(chan interface{})
+	behaviorFunc := func(cell mesh.Cell, in mesh.Receptor, out mesh.Emitter) error {
+		i := 0
+		for {
+			select {
+			case <-cell.Context().Done():
+				return nil
+			case evt := <-in.Pull():
+				i++
+				if evt.Topic() == "get-i" {
+					sigc <- i
+				}
+			}
+		}
+	}
+	msh := mesh.New(ctx)
+	emtr, err := msh.Emitter("testing")
+	assert.ErrorContains(err, "cell \"testing\" does not exist")
+
+	msh.Go("testing", mesh.BehaviorFunc(behaviorFunc))
+	emtr, err = msh.Emitter("testing")
+	assert.NoError(err)
+
+	emtr.Emit(mesh.NewEvent("one"))
+	emtr.Emit(mesh.NewEvent("two"))
+	emtr.Emit(mesh.NewEvent("three"))
+	emtr.Emit(mesh.NewEvent("get-i"))
 
 	assert.Wait(sigc, 4, time.Second)
 

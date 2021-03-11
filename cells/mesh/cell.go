@@ -84,7 +84,7 @@ func (c *cell) unsubscribeFrom(inCell *cell) {
 
 // unsubscribeFromAll removes the subscription from all cells this
 // one subscribed to.
-func (c *cell) unsubscribFromeAll() {
+func (c *cell) unsubscribeFromAll() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for inCell := range c.inCells {
@@ -97,7 +97,7 @@ func (c *cell) unsubscribFromeAll() {
 // them, and then tell the mesh that it's not available anymore.
 func (c *cell) backend() {
 	defer func() {
-		c.unsubscribFromeAll()
+		c.unsubscribeFromAll()
 		c.drop()
 	}()
 	if err := c.behavior.Go(c, c.in, c.out); err != nil {
