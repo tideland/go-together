@@ -103,7 +103,8 @@ func TestCellChain(t *testing.T) {
 func TestCellAutoUnsubscribe(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	ctx, cancel := context.WithCancel(context.Background())
-	events := []*Event{}
+	failed := []*Event{}
+	collected := []*Event{}
 	sigc := make(chan interface{})
 	forwarder := func(cell Cell, evt *Event, out Emitter) error {
 		return out.Emit(evt)
@@ -111,9 +112,9 @@ func TestCellAutoUnsubscribe(t *testing.T) {
 	cForwarderA := newCell(ctx, "forwarderA", meshStub{}, NewRequestBehavior(forwarder), drop)
 	cForwarderB := newCell(ctx, "forwarderB", meshStub{}, NewRequestBehavior(forwarder), drop)
 	failer := func(cell Cell, evt *Event, out Emitter) error {
-		if evt.Topic() == "fail" {
-			msg, _ := evt.StringAt("message")
-			return errors.New(msg)
+		failed = append(failed, evt)
+		if len(failed) == 3 {
+			return errors.New("done")
 		}
 		return out.Emit(evt)
 	}
@@ -121,8 +122,8 @@ func TestCellAutoUnsubscribe(t *testing.T) {
 	cFailer.subscribeTo(cForwarderA)
 	cFailer.subscribeTo(cForwarderB)
 	collector := func(cell Cell, evt *Event, out Emitter) error {
-		events = append(events, evt)
-		if len(events) == 3 {
+		collected = append(collected, evt)
+		if len(collected) == 3 {
 			close(sigc)
 		}
 		return nil
@@ -132,20 +133,21 @@ func TestCellAutoUnsubscribe(t *testing.T) {
 
 	cForwarderA.in.Emit(NewEvent("foo"))
 	cForwarderB.in.Emit(NewEvent("bar"))
-	cForwarderA.in.Emit(NewEvent("fail", "message", "ouch"))
+	cForwarderA.in.Emit(NewEvent("baz"))
 
 	assert.WaitClosed(sigc, time.Second)
+
 	cForwarderA.in.Emit(NewEvent("dont-care"))
 	cForwarderB.in.Emit(NewEvent("dont-care"))
 
 	foundc := make(chan interface{})
 
-	for _, event := range events {
+	for _, event := range collected {
 		if event.Topic() == ErrorTopic {
 			name, _ := event.StringAt(NameKey)
 			assert.Equal(name, "failer")
 			message, _ := event.StringAt(MessageKey)
-			assert.Equal(message, "ouch")
+			assert.Equal(message, "done")
 			close(foundc)
 			break
 		}
