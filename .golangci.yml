@@ -7,7 +7,6 @@ linters:
     - deadcode
     - dupl
     - errcheck
-    - funlen
     - goconst
     - gocritic
     - gocyclo
@@ -31,5 +30,5 @@ linters:
 
 issues:
   exclude:
-  # gocyclo
-  - cyclomatic complexity [0-9]+ of func `main` is high
+    # gocyclo
+    - cyclomatic complexity [0-9]+ of func `main` is high

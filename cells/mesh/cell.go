@@ -1,199 +1,112 @@
 // Tideland Go Together - Cells - Mesh
 //
-// Copyright (C) 2010-2020 Frank Mueller / Tideland / Oldenburg / Germany
+// Copyright (C) 2010-2021 Frank Mueller / Tideland / Oldenburg / Germany
 //
 // All rights reserved. Use of this source code is governed
-// by the new BSD license
+// by the new BSD license.
 
-package mesh // import "tideland.dev/go/together/cells/mesh"
+package mesh
 
 //--------------------
-// IMPORTS
+// IMPORT
 //--------------------
 
 import (
-	"tideland.dev/go/together/actor"
-	"tideland.dev/go/together/cells/event"
-	"tideland.dev/go/together/fuse"
-	"tideland.dev/go/trace/failure"
+	"context"
+	"sync"
 )
 
 //--------------------
 // CELL
 //--------------------
 
-// cell runs a behavior for the processing of events and emitting of
-// resulting events.
+// cell runs a behevior networked with other cells.
 type cell struct {
-	msh             *Mesh
-	behavior        Behavior
-	queueCap        int
-	subscribedCells map[string]*cell
-	act             *actor.Actor
+	mu       sync.RWMutex
+	ctx      context.Context
+	name     string
+	mesh     Mesh
+	behavior Behavior
+	in       *stream
+	inCells  map[*cell]struct{}
+	out      *streams
+	drop     func()
 }
 
-// newCell creates a new cell running the given behavior in a goroutine.
-func newCell(msh *Mesh, behavior Behavior) (*cell, error) {
+// newCell starts a new cell working in the background.
+func newCell(ctx context.Context, name string, m Mesh, b Behavior, drop func()) *cell {
 	c := &cell{
-		msh:             msh,
-		behavior:        behavior,
-		queueCap:        msh.queueCap,
-		subscribedCells: map[string]*cell{},
+		ctx:      ctx,
+		name:     name,
+		mesh:     m,
+		behavior: b,
+		in:       newStream(),
+		inCells:  make(map[*cell]struct{}),
+		out:      newStreams(),
+		drop:     drop,
 	}
-	// Initialize the behavior with the freshly created cell as emitter.
-	err := c.behavior.Init(c)
-	if err != nil {
-		return nil, failure.Annotate(err, "init cell %q", behavior.ID())
-	}
-	// Configure the cell if wanted.
-	if configurator, ok := behavior.(Configurator); ok {
-		configurator.Configure(c)
-	}
-	// Start the backend.
-	act, err := actor.Go(
-		actor.WithQueueCap(c.queueCap),
-		actor.WithRepairer(behavior.Repair),
-		actor.WithFinalizer(c.finalize),
-	)
-	if err != nil {
-		return nil, failure.Annotate(err, "init cell %q", behavior.ID())
-	}
-	c.act = act
-	return c, nil
+	go c.backend()
+	return c
 }
 
-// Subscribers is part of the emitter interface and returns the
-// the IDs of the subscriber cells.
-func (c *cell) Subscribers() []string {
-	var subscriberIDs []string
-	for subscriberID := range c.subscribedCells {
-		subscriberIDs = append(subscriberIDs, subscriberID)
-	}
-	return subscriberIDs
+// Context implements Cell.
+func (c *cell) Context() context.Context {
+	return c.ctx
 }
 
-// Emit is part of Emitter interface and emits the given event
-// to the given subscriber if it exists.
-func (c *cell) Emit(id string, evt *event.Event) error {
-	subscriber, ok := c.subscribedCells[id]
-	if !ok {
-		return failure.New("emit: cell %q is no subscriber", id)
-	}
-	return subscriber.process(evt)
+// Name implements Cell.
+func (c *cell) Name() string {
+	return c.name
 }
 
-// Broadcast is part of Emitter interface and emits the given
-// event to all subscribers.
-func (c *cell) Broadcast(evt *event.Event) error {
-	var serrs []error
-	for _, subscriber := range c.subscribedCells {
-		serrs = append(serrs, subscriber.process(evt))
-	}
-	return failure.Collect(serrs...)
-}
-
-// Self is part of Emitter interface and emits the given event
-// back to the cell itself.
-func (c *cell) Self(evt *event.Event) {
-	fuse.Trigger(c.msh.Emit(c.behavior.ID(), evt))
-}
-
-// SetQueueCap is part of the Configurable interface and allows
-// a behavior to set the queue capacity.
-func (c *cell) SetQueueCap(qc int) {
-	if qc > 1 {
-		c.queueCap = qc
-	}
-}
-
-// subscribers returns the subscriber IDs of the cell.
-func (c *cell) subscribers() ([]string, error) {
-	var subscriberIDs []string
-	if aerr := c.act.DoSync(func() {
-		subscriberIDs = c.Subscribers()
-	}); aerr != nil {
-		return nil, failure.Annotate(aerr, "subscribers of cell %q", c.behavior.ID())
-	}
-	return subscriberIDs, nil
-}
-
-// subscribe adds cells to the subscribers of this cell.
-func (c *cell) subscribe(subscribers []*cell) error {
-	if aerr := c.act.DoSync(func() {
-		for _, subscriber := range subscribers {
-			c.subscribedCells[subscriber.behavior.ID()] = subscriber
-		}
-	}); aerr != nil {
-		return failure.Annotate(aerr, "subscribe cell %q", c.behavior.ID())
-	}
+// Mesh implements Cell.
+func (c *cell) Mesh() Mesh {
 	return nil
 }
 
-// unsubscribe removes cells from the subscribers of this cell.
-func (c *cell) unsubscribe(subscribers []*cell) error {
-	if aerr := c.act.DoSync(func() {
-		for _, subscriber := range subscribers {
-			delete(c.subscribedCells, subscriber.behavior.ID())
-		}
-	}); aerr != nil {
-		return failure.Annotate(aerr, "unsubscribe cell %q", c.behavior.ID())
+// subscribeTo adds the cell to the out-streams of the
+// given in-cell.
+func (c *cell) subscribeTo(inCell *cell) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	inCell.out.add(c.in)
+	c.inCells[inCell] = struct{}{}
+}
+
+// unsubscribeFrom removes the cell from the out-streams of the
+// given in-cell.
+func (c *cell) unsubscribeFrom(inCell *cell) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	inCell.out.remove(c.in)
+	delete(c.inCells, inCell)
+}
+
+// unsubscribeFromAll removes the subscription from all cells this
+// one subscribed to.
+func (c *cell) unsubscribeFromAll() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for inCell := range c.inCells {
+		inCell.out.remove(c.in)
 	}
-	return nil
 }
 
-// process lets the cell behavior process the event asynchronously.
-func (c *cell) process(evt *event.Event) error {
-	if aerr := c.act.DoAsync(func() {
-		if evt.Done() {
-			return
-		}
-		c.behavior.Process(evt)
-	}); aerr != nil {
-		return failure.Annotate(aerr, "processing cell %q", c.behavior.ID())
+// backend runs as goroutine and cares for the behavior. When it ends
+// it will send a notification to all subscribers, unsubscribe from
+// them, and then tell the mesh that it's not available anymore.
+func (c *cell) backend() {
+	defer func() {
+		c.unsubscribeFromAll()
+		c.drop()
+	}()
+	if err := c.behavior.Go(c, c.in, c.out); err != nil {
+		// Notify subscribers about error.
+		c.out.Emit(NewEvent(ErrorTopic, NameKey, c.name, MessageKey, err.Error()))
+	} else {
+		// Notify subscribers about termination.
+		c.out.Emit(NewEvent(TerminationTopic, NameKey, c.name))
 	}
-	return nil
-}
-
-// Finalize implements the loop.Finalizer to perform termination
-// when the actor stops.
-func (c *cell) finalize(err error) error {
-	terr := c.behavior.Terminate()
-	c.behavior = &terminatedBehavior{c.behavior.ID()}
-	c.subscribedCells = map[string]*cell{}
-	return failure.Collect(err, terr)
-}
-
-// stop tells the actor to stop with finalizing for termination
-// of the behavior.
-func (c *cell) stop() {
-	c.act.Stop()
-}
-
-//--------------------
-// TERMINATED BEHAVIOR
-//--------------------
-
-// terminatedBehavior will be used by a cell after shutting down.
-type terminatedBehavior struct {
-	id string
-}
-
-func (db *terminatedBehavior) ID() string {
-	return db.id
-}
-
-func (db *terminatedBehavior) Init(emitter Emitter) error {
-	return nil
-}
-
-func (db *terminatedBehavior) Terminate() error {
-	return nil
-}
-
-func (db *terminatedBehavior) Process(evt *event.Event) {}
-
-func (db *terminatedBehavior) Repair(r interface{}) error {
-	return nil
 }
 
 // EOF

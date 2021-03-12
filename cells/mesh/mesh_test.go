@@ -1,11 +1,11 @@
-// Tideland Go Together - Cells - Mesh - Unit Tests
+// Tideland Go Together - Cells - Mesh - Tests
 //
-// Copyright (C) 2010-2020 Frank Mueller / Tideland / Oldenburg / Germany
+// Copyright (C) 2010-2021 Frank Mueller / Tideland / Oldenburg / Germany
 //
 // All rights reserved. Use of this source code is governed
-// by the new BSD license
+// by the new BSD license.
 
-package mesh_test // import "tideland.dev/go/together/cells/mesh"
+package mesh_test
 
 //--------------------
 // IMPORTS
@@ -13,500 +13,199 @@ package mesh_test // import "tideland.dev/go/together/cells/mesh"
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
 	"tideland.dev/go/audit/asserts"
-	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
 )
-
-//--------------------
-// CONSTANTS
-//--------------------
-
-const waitTimeout = time.Second
 
 //--------------------
 // TESTS
 //--------------------
 
-// TestSpawnCells verifies starting the mesh, spawning some
-// cells, and stops the mesh.
-func TestSpawnCells(t *testing.T) {
+// TestNewMesh verifies the simple creation of a mesh.
+func TestNewMesh(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	msh := mesh.New()
+	ctx, cancel := context.WithCancel(context.Background())
+	msh := mesh.New(ctx)
 
-	err := msh.SpawnCells(
-		NewTestBehavior("foo"),
-		NewTestBehavior("bar"),
-		NewTestBehavior("baz"),
-	)
-	assert.OK(err)
+	assert.NotNil(msh)
 
-	ids := msh.Cells()
-	assert.Length(ids, 3)
-	assert.Contains("foo", ids)
-	assert.Contains("bar", ids)
-	assert.Contains("baz", ids)
-
-	msh.Stop()
+	cancel()
 }
 
-// TestSpawnDoubleCells verifies starting the mesh, spawning double
-// cells, and checking the returned error.
-func TestSpawnDoubleCells(t *testing.T) {
+// TestMeshGo verifies the starting of a cell via mesh.
+func TestMeshGo(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	msh := mesh.New()
-
-	err := msh.SpawnCells(
-		NewTestBehavior("foo"),
-	)
-	assert.OK(err)
-
-	err = msh.SpawnCells(
-		NewTestBehavior("foo"),
-		NewTestBehavior("bar"),
-	)
-	assert.ErrorContains(err, "spawn cells: double id(s) [foo]")
-
-	ids := msh.Cells()
-	assert.Length(ids, 1)
-
-	msh.Stop()
-}
-
-// TestSpawnErrorCells verifies starting the mesh, spawning cell
-// returning an error during init, and checking the returned error.
-func TestSpawnErrorCells(t *testing.T) {
-	assert := asserts.NewTesting(t, asserts.FailStop)
-	msh := mesh.New()
-
-	err := msh.SpawnCells(
-		NewTestBehavior("foo"),
-		NewTestBehavior("bar"),
-	)
-	assert.OK(err)
-
-	err = msh.SpawnCells(
-		NewTestBehavior("crash"),
-		NewTestBehavior("baz"),
-		NewTestBehavior("boom"),
-	)
-	assert.ErrorMatch(err, ".*spawn cells.*crashing.*exploding")
-
-	ids := msh.Cells()
-	assert.Length(ids, 3)
-
-	msh.Stop()
-}
-
-// TestStopCells verifies stopping some cells.
-func TestStopCells(t *testing.T) {
-	assert := asserts.NewTesting(t, asserts.FailStop)
-	msh := mesh.New()
-
-	// Initial environment with subscriptions.
-	err := msh.SpawnCells(
-		NewTestBehavior("foo"),
-		NewTestBehavior("bar"),
-		NewTestBehavior("baz"),
-	)
-	assert.OK(err)
-
-	ids := msh.Cells()
-	assert.Length(ids, 3)
-	assert.Contains("foo", ids)
-	assert.Contains("bar", ids)
-	assert.Contains("baz", ids)
-
-	assert.OK(msh.Subscribe("foo", "bar", "baz"))
-
-	fooS, err := msh.Subscribers("foo")
-	assert.OK(err)
-	assert.Length(fooS, 2)
-	assert.Contains("bar", fooS)
-	assert.Contains("baz", fooS)
-
-	// Stopping shall unsubscribe too.
-	assert.OK(msh.StopCells("baz"))
-
-	ids = msh.Cells()
-	assert.Length(ids, 2)
-	assert.Contains("foo", ids)
-	assert.Contains("bar", ids)
-
-	fooS, err = msh.Subscribers("foo")
-	assert.OK(err)
-	assert.Length(fooS, 1)
-	assert.Contains("bar", fooS)
-
-	msh.Stop()
-}
-
-// TestTermination verifies calling the termination method.
-func TestTermination(t *testing.T) {
-	assert := asserts.NewTesting(t, asserts.FailStop)
-	msh := mesh.New()
-
-	// Initial environment with subscriptions.
-	err := msh.SpawnCells(
-		NewTestBehavior("bang"),
-	)
-	assert.OK(err)
-
-	assert.ErrorMatch(msh.Stop(), ".*breaking.*")
-}
-
-// TestEmitEvents verifies emitting some events to a node.
-func TestEmitEvents(t *testing.T) {
-	assert := asserts.NewTesting(t, asserts.FailStop)
-	msh := mesh.New()
-
-	err := msh.SpawnCells(
-		NewTestBehavior("foo"),
-	)
-	assert.OK(err)
-
-	assert.OK(msh.Emit("foo", event.New("set", "a", 1)))
-	assert.OK(msh.Emit("foo", event.New("set", "b", 2)))
-	assert.OK(msh.Emit("foo", event.New("set", "c", 3)))
-
-	pl, plc := event.NewReplyPayload()
-
-	assert.OK(msh.Emit("foo", event.New("send", pl)))
-
-	plr, err := plc.Wait(waitTimeout)
-
-	assert.OK(err)
-	assert.Equal(plr.At("a").AsInt(0), 1)
-	assert.Equal(plr.At("b").AsInt(0), 2)
-	assert.Equal(plr.At("c").AsInt(0), 3)
-
-	assert.OK(msh.Stop())
-}
-
-// TestEmitContextEvents verifies emitting some events with a context
-// to a node. Some of those will timeout.
-func TestEmitContextEvents(t *testing.T) {
-	assert := asserts.NewTesting(t, asserts.FailStop)
-	msh := mesh.New()
-
-	err := msh.SpawnCells(
-		NewTestBehavior("foo"),
-	)
-	assert.OK(err)
-
-	ctxA := context.Background()
-	ctxB, cancel := context.WithTimeout(ctxA, 5*time.Millisecond)
-	defer cancel()
-
-	assert.OK(msh.Emit("foo", event.WithContext(ctxA, "set", "a", 5)))
-	assert.OK(msh.Emit("foo", event.WithContext(ctxA, "set", "b", 5)))
-
-	time.Sleep(20 * time.Millisecond)
-
-	assert.OK(msh.Emit("foo", event.WithContext(ctxB, "set", "b", 10)))
-
-	pl, plc := event.NewReplyPayload()
-
-	assert.OK(msh.Emit("foo", event.New("send", pl)))
-
-	plr, err := plc.Wait(waitTimeout)
-
-	assert.OK(err)
-	assert.Equal(plr.At("a").AsInt(0), 5)
-	assert.Equal(plr.At("b").AsInt(0), 5)
-
-	assert.OK(msh.Stop())
-}
-
-// TestBroadcastEvents verifies broadcasting some events to a node.
-func TestBroadcastEvents(t *testing.T) {
-	assert := asserts.NewTesting(t, asserts.FailStop)
-	msh := mesh.New()
-	assertData := func(id string) {
-		pl, plc := event.NewReplyPayload()
-
-		assert.OK(msh.Emit(id, event.New("send", pl)))
-
-		plr, err := plc.Wait(waitTimeout)
-
-		assert.OK(err)
-		assert.Equal(plr.At("a").AsInt(0), 1)
-		assert.Equal(plr.At("b").AsInt(0), 2)
-		assert.Equal(plr.At("c").AsInt(0), 3)
+	ctx, cancel := context.WithCancel(context.Background())
+	sigc := make(chan interface{})
+	behaviorFunc := func(cell mesh.Cell, in mesh.Receptor, out mesh.Emitter) error {
+		sigc <- cell.Name()
+		return nil
 	}
+	msh := mesh.New(ctx)
 
-	err := msh.SpawnCells(
-		NewTestBehavior("foo"),
-		NewTestBehavior("bar"),
-		NewTestBehavior("baz"),
-	)
-	assert.OK(err)
+	msh.Go("testing", mesh.BehaviorFunc(behaviorFunc))
 
-	assert.OK(msh.Broadcast(event.New("set", "a", 1, "b", 2, "c", 3)))
+	assert.Wait(sigc, "testing", time.Second)
 
-	assertData("foo")
-	assertData("bar")
-	assertData("baz")
-
-	assert.OK(msh.Stop())
+	cancel()
 }
 
-// TestBehaviorEmit verifies the emitting to individual subscribers.
-func TestBehaviorEmit(t *testing.T) {
+// TestMeshSubscriptions verifies the subscription and unsubscription
+// of cells.
+func TestMeshSubscriptions(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	msh := mesh.New()
-
-	err := msh.SpawnCells(
-		NewTestBehavior("foo"),
-		NewTestBehavior("bar"),
-		NewTestBehavior("baz"),
-	)
-	assert.OK(err)
-
-	assert.OK(msh.Subscribe("foo", "bar", "baz"))
-
-	assert.OK(msh.Emit("foo", event.New("emit", "to", "bar", "value", 1234)))
-	assert.OK(msh.Emit("foo", event.New("emit", "to", "baz", "value", 4321)))
-
-	assertSend := func(id string, value int) {
-		pl, plc := event.NewReplyPayload()
-		assert.OK(msh.Emit(id, event.New("send", pl)))
-		plr, err := plc.Wait(waitTimeout)
-		assert.OK(err)
-		assert.Equal(plr.At("value").AsInt(0), value)
-	}
-
-	waitEvents(assert, msh, "foo")
-	assertSend("bar", 1234)
-	assertSend("baz", 4321)
-
-	assert.OK(msh.Stop())
-}
-
-// TestSubscribe verifies the subscription of cells.
-func TestSubscribe(t *testing.T) {
-	assert := asserts.NewTesting(t, asserts.FailStop)
-	msh := mesh.New()
-
-	err := msh.SpawnCells(
-		NewTestBehavior("foo"),
-		NewTestBehavior("bar"),
-		NewTestBehavior("baz"),
-	)
-	assert.OK(err)
-
-	assert.OK(msh.Subscribe("foo", "bar", "baz"))
-
-	// Directly ask mesh.
-	fooS, err := msh.Subscribers("foo")
-	assert.OK(err)
-	assert.Length(fooS, 2)
-	assert.Contains("bar", fooS)
-	assert.Contains("baz", fooS)
-
-	// Send event to store subscribers
-	assert.OK(msh.Emit("foo", event.New("subscribers")))
-	pl, plc := event.NewReplyPayload()
-	assert.OK(msh.Emit("foo", event.New("send", pl)))
-	plr, err := plc.Wait(waitTimeout)
-	assert.OK(err)
-	assert.Equal(plr.At("bar").AsInt(0), 1)
-	assert.Equal(plr.At("baz").AsInt(0), 1)
-
-	// Set additional values and let emit length.
-	assert.OK(msh.Emit("foo", event.New("set", "a", 1, "b", 1234)))
-	assert.OK(msh.Emit("foo", event.New("length")))
-	waitEvents(assert, msh, "foo")
-
-	// Ask bar for received length.
-	assert.OK(msh.Emit("bar", event.New("send", pl)))
-	plr, err = plc.Wait(waitTimeout)
-	assert.OK(err)
-	assert.Equal(plr.At("length").AsInt(0), 4)
-
-	assert.OK(msh.Stop())
-}
-
-// TestUnsubscribe verifies the unsubscription of cells.
-func TestUnsubscribe(t *testing.T) {
-	assert := asserts.NewTesting(t, asserts.FailStop)
-	msh := mesh.New()
-
-	err := msh.SpawnCells(
-		NewTestBehavior("foo"),
-		NewTestBehavior("bar"),
-		NewTestBehavior("baz"),
-	)
-	assert.OK(err)
-
-	// Subscribe bar and baz, test both.
-	assert.OK(msh.Subscribe("foo", "bar", "baz"))
-
-	fooS, err := msh.Subscribers("foo")
-	assert.OK(err)
-	assert.Length(fooS, 2)
-	assert.Contains("bar", fooS)
-	assert.Contains("baz", fooS)
-
-	// Unsubscribe baz.
-	assert.OK(msh.Unsubscribe("foo", "baz"))
-
-	fooS, err = msh.Subscribers("foo")
-	assert.OK(err)
-	assert.Length(fooS, 1)
-	assert.Contains("bar", fooS)
-
-	assert.OK(msh.Stop())
-}
-
-// TestInvalidSubscriptions verifies the invalid (un)subscriptions of cells.
-func TestInvalidSubscriptions(t *testing.T) {
-	assert := asserts.NewTesting(t, asserts.FailStop)
-	msh := mesh.New()
-
-	err := msh.SpawnCells(
-		NewTestBehavior("foo"),
-		NewTestBehavior("bar"),
-	)
-	assert.OK(err)
-
-	err = msh.Subscribe("foo", "bar", "baz")
-	assert.ErrorMatch(err, ".*cannot find cell.*")
-
-	err = msh.Subscribe("foo", "bar")
-	assert.OK(err)
-
-	err = msh.Unsubscribe("foo", "bar", "baz")
-	assert.ErrorMatch(err, ".*cannot find cell.*")
-
-	err = msh.Unsubscribe("foo", "bar")
-	assert.OK(err)
-
-	err = msh.Unsubscribe("foo", "bar")
-	assert.OK(err)
-
-	assert.OK(msh.Stop())
-}
-
-// TestSubscriberIDs verifies the retrieval of subscriber IDs.
-func TestSubscriberIDs(t *testing.T) {
-	assert := asserts.NewTesting(t, asserts.FailStop)
-	msh := mesh.New()
-
-	err := msh.SpawnCells(
-		NewTestBehavior("foo"),
-		NewTestBehavior("bar"),
-		NewTestBehavior("baz"),
-	)
-	assert.OK(err)
-
-	err = msh.Subscribe("foo", "bar", "baz")
-	assert.OK(err)
-
-	subscriberIDs, err := msh.Subscribers("foo")
-	assert.OK(err)
-	assert.Length(subscriberIDs, 2)
-
-	subscriberIDs, err = msh.Subscribers("bar")
-	assert.OK(err)
-	assert.Length(subscriberIDs, 0)
-
-	err = msh.Unsubscribe("foo", "baz")
-	assert.OK(err)
-
-	subscriberIDs, err = msh.Subscribers("foo")
-	assert.OK(err)
-	assert.Length(subscriberIDs, 1)
-
-	assert.OK(msh.Stop())
-}
-
-//--------------------
-// HELPERS
-//--------------------
-
-func waitEvents(assert *asserts.Asserts, msh *mesh.Mesh, id string) {
-	pl, plc := event.NewReplyPayload()
-	assert.OK(msh.Emit(id, event.New("send", pl)))
-	_, err := plc.Wait(waitTimeout)
-	assert.OK(err)
-}
-
-type TestBehavior struct {
-	id      string
-	emitter mesh.Emitter
-	datas   map[string]int
-}
-
-func NewTestBehavior(id string) *TestBehavior {
-	return &TestBehavior{
-		id:    id,
-		datas: make(map[string]int),
-	}
-}
-
-func (tb *TestBehavior) ID() string {
-	return tb.id
-}
-
-func (tb *TestBehavior) Init(emitter mesh.Emitter) error {
-	switch tb.id {
-	case "crash":
-		return errors.New("crashing")
-	case "boom":
-		return errors.New("exploding")
-	}
-	tb.emitter = emitter
-	return nil
-}
-
-func (tb *TestBehavior) Terminate() error {
-	if tb.id == "bang" {
-		return errors.New("breaking")
-	}
-	return nil
-}
-
-func (tb *TestBehavior) Process(evt *event.Event) {
-	switch evt.Topic() {
-	case "set":
-		_ = evt.Payload().Do(func(key string, value *event.Value) error {
-			tb.datas[key] = value.AsInt(-1)
-			return nil
-		})
-	case "emit":
-		to := evt.Payload().At("to").AsString("<unknown>")
-		value := evt.Payload().At("value").AsInt(-1)
-		_ = tb.emitter.Emit(to, event.New("set", "value", value))
-	case "subscribers":
-		ids := tb.emitter.Subscribers()
-		for _, id := range ids {
-			tb.datas[id] = 1
+	ctx, cancel := context.WithCancel(context.Background())
+	sigc := make(chan interface{})
+	forwardFunc := func(cell mesh.Cell, in mesh.Receptor, out mesh.Emitter) error {
+		for {
+			select {
+			case <-cell.Context().Done():
+				return nil
+			case evt := <-in.Pull():
+				out.Emit(evt)
+			}
 		}
-	case "length":
-		_ = tb.emitter.Broadcast(event.New("set", "length", len(tb.datas)))
-	case "send":
-		_ = evt.Payload().Reply(event.NewPayload(tb.datas))
-	case "clear":
-		tb.datas = make(map[string]int)
 	}
+	collectFunc := func(cell mesh.Cell, in mesh.Receptor, out mesh.Emitter) error {
+		topics := []string{}
+		for {
+			select {
+			case <-cell.Context().Done():
+				return nil
+			case evt := <-in.Pull():
+				topics = append(topics, evt.Topic())
+				if len(topics) == 3 {
+					sigc <- len(topics)
+				}
+			}
+		}
+	}
+	msh := mesh.New(ctx)
+
+	// Both cells do not exist.
+	err := msh.Subscribe("forwarder", "collector-a")
+	assert.ErrorContains(err, "cell \"forwarder\" does not exist")
+
+	msh.Go("forwarder", mesh.BehaviorFunc(forwardFunc))
+
+	// One cell do not exist.
+	err = msh.Subscribe("forwarder", "collector-a")
+	assert.ErrorContains(err, "cell \"collector-a\" does not exist")
+
+	// Both cells exist.
+	msh.Go("collector-a", mesh.BehaviorFunc(collectFunc))
+	err = msh.Subscribe("forwarder", "collector-a")
+	assert.NoError(err)
+
+	msh.Emit("forwarder", mesh.NewEvent("one"))
+	msh.Emit("forwarder", mesh.NewEvent("two"))
+	msh.Emit("forwarder", mesh.NewEvent("three"))
+
+	assert.Wait(sigc, 3, time.Second)
+
+	// Unsubscribe one collector but subscribe a new one.
+	err = msh.Unsubscribe("forwarder", "collector-a")
+	assert.NoError(err)
+	msh.Go("collector-b", mesh.BehaviorFunc(collectFunc))
+	err = msh.Subscribe("forwarder", "collector-b")
+	assert.NoError(err)
+
+	msh.Emit("forwarder", mesh.NewEvent("one"))
+	msh.Emit("forwarder", mesh.NewEvent("two"))
+	msh.Emit("forwarder", mesh.NewEvent("three"))
+
+	assert.Wait(sigc, 3, time.Second)
+
+	// Unsubscribe not existing cell.
+	err = msh.Unsubscribe("forwarder", "dont-exist")
+	assert.ErrorContains(err, "cell \"dont-exist\" does not exist")
+
+	// Unsubscribe not subscribed cell.
+	err = msh.Unsubscribe("forwarder", "collector-a")
+	assert.NoError(err)
+
+	// Unsubscribe subscribed cell.
+	err = msh.Unsubscribe("forwarder", "collector-b")
+	assert.NoError(err)
+
+	cancel()
 }
 
-func (tb *TestBehavior) Repair(r interface{}) error {
-	return nil
+// TestMeshEmit verifies the emitting of events to one cell.
+func TestMeshEmit(t *testing.T) {
+	assert := asserts.NewTesting(t, asserts.FailStop)
+	ctx, cancel := context.WithCancel(context.Background())
+	sigc := make(chan interface{})
+	behaviorFunc := func(cell mesh.Cell, in mesh.Receptor, out mesh.Emitter) error {
+		i := 0
+		for {
+			select {
+			case <-cell.Context().Done():
+				return nil
+			case evt := <-in.Pull():
+				i++
+				if evt.Topic() == "get-i" {
+					sigc <- i
+				}
+			}
+		}
+	}
+	msh := mesh.New(ctx)
+	err := msh.Emit("testing", mesh.NewEvent("one"))
+	assert.ErrorContains(err, "cell \"testing\" does not exist")
+
+	msh.Go("testing", mesh.BehaviorFunc(behaviorFunc))
+
+	err = msh.Emit("testing", mesh.NewEvent("one"))
+	assert.NoError(err)
+
+	msh.Emit("testing", mesh.NewEvent("two"))
+	msh.Emit("testing", mesh.NewEvent("three"))
+	msh.Emit("testing", mesh.NewEvent("get-i"))
+
+	assert.Wait(sigc, 4, time.Second)
+
+	cancel()
 }
 
-type TestConfigureBehavior struct {
-	*TestBehavior
-	queueCap int
-}
+// TestMeshEmitter verifies the emitting of events to one cell using an emitter.
+func TestMeshEmitter(t *testing.T) {
+	assert := asserts.NewTesting(t, asserts.FailStop)
+	ctx, cancel := context.WithCancel(context.Background())
+	sigc := make(chan interface{})
+	behaviorFunc := func(cell mesh.Cell, in mesh.Receptor, out mesh.Emitter) error {
+		i := 0
+		for {
+			select {
+			case <-cell.Context().Done():
+				return nil
+			case evt := <-in.Pull():
+				i++
+				if evt.Topic() == "get-i" {
+					sigc <- i
+				}
+			}
+		}
+	}
+	msh := mesh.New(ctx)
+	emtr, err := msh.Emitter("testing")
+	assert.ErrorContains(err, "cell \"testing\" does not exist")
 
-func (tcb *TestConfigureBehavior) Configure(c mesh.Configurable) {
-	c.SetQueueCap(tcb.queueCap)
+	msh.Go("testing", mesh.BehaviorFunc(behaviorFunc))
+	emtr, err = msh.Emitter("testing")
+	assert.NoError(err)
+
+	emtr.Emit(mesh.NewEvent("one"))
+	emtr.Emit(mesh.NewEvent("two"))
+	emtr.Emit(mesh.NewEvent("three"))
+	emtr.Emit(mesh.NewEvent("get-i"))
+
+	assert.Wait(sigc, 4, time.Second)
+
+	cancel()
 }
 
 // EOF
