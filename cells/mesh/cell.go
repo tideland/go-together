@@ -5,7 +5,7 @@
 // All rights reserved. Use of this source code is governed
 // by the new BSD license.
 
-package mesh
+package mesh // import "tideland.dev/go/together/cells/mesh"
 
 //--------------------
 // IMPORT
@@ -102,10 +102,10 @@ func (c *cell) backend() {
 	}()
 	if err := c.behavior.Go(c, c.in, c.out); err != nil {
 		// Notify subscribers about error.
-		c.out.Emit(NewEvent(ErrorTopic, NameKey, c.name, MessageKey, err.Error()))
+		c.out.Emit(NewEvent(TopicError, KeyName, c.name, KeyMessage, err.Error()))
 	} else {
 		// Notify subscribers about termination.
-		c.out.Emit(NewEvent(TerminationTopic, NameKey, c.name))
+		c.out.Emit(NewEvent(TopicTerminated, KeyName, c.name))
 	}
 }
 

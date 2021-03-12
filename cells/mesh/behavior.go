@@ -5,7 +5,7 @@
 // All rights reserved. Use of this source code is governed
 // by the new BSD license.
 
-package mesh
+package mesh // import "tideland.dev/go/together/cells/mesh"
 
 //--------------------
 // IMPORT
@@ -68,6 +68,17 @@ type Behavior interface {
 	// of the implementation to run a select loop, receive incomming
 	// events via the input queue, and emit events via the output queue
 	// if needed.
+	//
+	//     for {
+	//         select {
+	//         case <-cell.Context().Done():
+	//             return nil
+	//         case evt := <-in.Pull():
+	//             ...
+	//             out.Emit(mesh.NewVent("my-topic", "x", 12345))
+	//         }
+	//     }
+	//
 	Go(cell Cell, in Receptor, out Emitter) error
 }
 

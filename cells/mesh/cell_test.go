@@ -5,7 +5,7 @@
 // All rights reserved. Use of this source code is governed
 // by the new BSD license.
 
-package mesh
+package mesh // import "tideland.dev/go/together/cells/mesh"
 
 //--------------------
 // IMPORTS
@@ -143,10 +143,10 @@ func TestCellAutoUnsubscribe(t *testing.T) {
 	foundc := make(chan interface{})
 
 	for _, event := range collected {
-		if event.Topic() == ErrorTopic {
-			name, _ := event.StringAt(NameKey)
+		if event.Topic() == TopicError {
+			name, _ := event.StringAt(KeyName)
 			assert.Equal(name, "failer")
-			message, _ := event.StringAt(MessageKey)
+			message, _ := event.StringAt(KeyMessage)
 			assert.Equal(message, "done")
 			close(foundc)
 			break

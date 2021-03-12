@@ -5,7 +5,7 @@
 // All rights reserved. Use of this source code is governed
 // by the new BSD license.
 
-package mesh_test
+package mesh_test // import "tideland.dev/go/together/cells/mesh"
 
 //--------------------
 // IMPORTS
@@ -60,7 +60,7 @@ func TestEventIterateValues(t *testing.T) {
 	evt := mesh.NewEvent("test", "a", 2, "b", 7, "c", 1, "d", 2)
 	sum := 0
 
-	evt.ValuesDo(func(key string, value interface{}) {
+	evt.Do(func(key string, value interface{}) {
 		i, ok := value.(int)
 
 		assert.True(ok)

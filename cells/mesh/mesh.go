@@ -5,7 +5,7 @@
 // All rights reserved. Use of this source code is governed
 // by the new BSD license.
 
-package mesh
+package mesh // import "tideland.dev/go/together/cells/mesh"
 
 //--------------------
 // IMPORT

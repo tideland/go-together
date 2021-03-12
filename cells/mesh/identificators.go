@@ -8,18 +8,16 @@
 package mesh // import "tideland.dev/go/together/cells/mesh"
 
 //--------------------
-// EMITTER
+// TOPICS AMD KEYS
 //--------------------
 
-// emitter allows the continuous emitting of events to a cell
-// without having to resolve the cell name each time.
-type emitter struct {
-	strean *stream
-}
+// Standard topics and keys.
+const (
+	TopicError      = "error"
+	TopicTerminated = "terminated"
 
-// Emit implements Emitter.
-func (e *emitter) Emit(evt *Event) error {
-	return e.strean.Emit(evt)
-}
+	KeyMessage = "messgae"
+	KeyName    = "name"
+)
 
 // EOF
