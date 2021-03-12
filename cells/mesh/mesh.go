@@ -58,34 +58,34 @@ func (m *mesh) Go(name string, b Behavior) error {
 }
 
 // Subscribe implements Mesh.
-func (m *mesh) Subscribe(fromName, toName string) error {
+func (m *mesh) Subscribe(emitterName, receptorName string) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	fromCell := m.cells[fromName]
-	toCell := m.cells[toName]
-	if fromCell == nil {
-		return fmt.Errorf("from cell %q does not exist", fromName)
+	emitterCell := m.cells[emitterName]
+	receptorCell := m.cells[receptorName]
+	if emitterCell == nil {
+		return fmt.Errorf("emitter cell %q does not exist", emitterName)
 	}
-	if toCell == nil {
-		return fmt.Errorf("to cell %q does not exist", toName)
+	if receptorCell == nil {
+		return fmt.Errorf("receptor cell %q does not exist", receptorName)
 	}
-	fromCell.subscribeTo(toCell)
+	receptorCell.subscribeTo(emitterCell)
 	return nil
 }
 
 // Unsubscribe implements Mesh.
-func (m *mesh) Unsubscribe(toName, fromName string) error {
+func (m *mesh) Unsubscribe(emitterName, receptorName string) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	toCell := m.cells[toName]
-	fromCell := m.cells[fromName]
-	if toCell == nil {
-		return fmt.Errorf("to cell %q does not exist", toName)
+	emitterCell := m.cells[emitterName]
+	receptorCell := m.cells[receptorName]
+	if emitterCell == nil {
+		return fmt.Errorf("emitter cell %q does not exist", emitterName)
 	}
-	if fromCell == nil {
-		return fmt.Errorf("from cell %q does not exist", fromName)
+	if receptorCell == nil {
+		return fmt.Errorf("receptor cell %q does not exist", receptorName)
 	}
-	toCell.unsubscribeFrom(fromCell)
+	receptorCell.unsubscribeFrom(emitterCell)
 	return nil
 }
 

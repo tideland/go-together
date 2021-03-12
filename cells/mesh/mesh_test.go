@@ -53,6 +53,87 @@ func TestMeshGo(t *testing.T) {
 	cancel()
 }
 
+// TestMeshSubscriptions verifies the subscription and unsubscription
+// of cells.
+func TestMeshSubscriptions(t *testing.T) {
+	assert := asserts.NewTesting(t, asserts.FailStop)
+	ctx, cancel := context.WithCancel(context.Background())
+	sigc := make(chan interface{})
+	forwardFunc := func(cell mesh.Cell, in mesh.Receptor, out mesh.Emitter) error {
+		for {
+			select {
+			case <-cell.Context().Done():
+				return nil
+			case evt := <-in.Pull():
+				out.Emit(evt)
+			}
+		}
+	}
+	collectFunc := func(cell mesh.Cell, in mesh.Receptor, out mesh.Emitter) error {
+		topics := []string{}
+		for {
+			select {
+			case <-cell.Context().Done():
+				return nil
+			case evt := <-in.Pull():
+				topics = append(topics, evt.Topic())
+				if len(topics) == 3 {
+					sigc <- len(topics)
+				}
+			}
+		}
+	}
+	msh := mesh.New(ctx)
+
+	// Both cells do not exist.
+	err := msh.Subscribe("forwarder", "collector-a")
+	assert.ErrorContains(err, "cell \"forwarder\" does not exist")
+
+	msh.Go("forwarder", mesh.BehaviorFunc(forwardFunc))
+
+	// One cell do not exist.
+	err = msh.Subscribe("forwarder", "collector-a")
+	assert.ErrorContains(err, "cell \"collector-a\" does not exist")
+
+	// Both cells exist.
+	msh.Go("collector-a", mesh.BehaviorFunc(collectFunc))
+	err = msh.Subscribe("forwarder", "collector-a")
+	assert.NoError(err)
+
+	msh.Emit("forwarder", mesh.NewEvent("one"))
+	msh.Emit("forwarder", mesh.NewEvent("two"))
+	msh.Emit("forwarder", mesh.NewEvent("three"))
+
+	assert.Wait(sigc, 3, time.Second)
+
+	// Unsubscribe one collector but subscribe a new one.
+	err = msh.Unsubscribe("forwarder", "collector-a")
+	assert.NoError(err)
+	msh.Go("collector-b", mesh.BehaviorFunc(collectFunc))
+	err = msh.Subscribe("forwarder", "collector-b")
+	assert.NoError(err)
+
+	msh.Emit("forwarder", mesh.NewEvent("one"))
+	msh.Emit("forwarder", mesh.NewEvent("two"))
+	msh.Emit("forwarder", mesh.NewEvent("three"))
+
+	assert.Wait(sigc, 3, time.Second)
+
+	// Unsubscribe not existing cell.
+	err = msh.Unsubscribe("forwarder", "dont-exist")
+	assert.ErrorContains(err, "cell \"dont-exist\" does not exist")
+
+	// Unsubscribe not subscribed cell.
+	err = msh.Unsubscribe("forwarder", "collector-a")
+	assert.NoError(err)
+
+	// Unsubscribe subscribed cell.
+	err = msh.Unsubscribe("forwarder", "collector-b")
+	assert.NoError(err)
+
+	cancel()
+}
+
 // TestMeshEmit verifies the emitting of events to one cell.
 func TestMeshEmit(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
