@@ -12,14 +12,12 @@ package behaviors_test // import "tideland.dev/go/together/cells/behaviors"
 //--------------------
 
 import (
-	"strings"
 	"testing"
 	"time"
 
 	"tideland.dev/go/audit/asserts"
 	"tideland.dev/go/audit/generators"
 	"tideland.dev/go/together/cells/behaviors"
-	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
 )
 
@@ -34,34 +32,35 @@ func TestAggregatorBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	generator := generators.New(generators.FixedRand())
 	count := 50
-	aggregate := func(data *mesh.Payload, evt *mesh.Event) (*mesh.Payload, error) {
-		topic := evt.Topic()
-		topics, err := data.StringAt("topics")
+	aggregator := func(data *mesh.Payload, evt *mesh.Event) (*mesh.Payload, error) {
+		counted, err := data.IntAt("counted")
 		assert.NoError(err)
-		topics += "/" + topic
-		return event.NewPayload("topics", topics), nil
+		counted++
+		return mesh.NewPayload("counted", counted), nil
 	}
-	plant := mesh.NewTestPlant(assert, behaviors.NewAggregatorBehavior("ab", event.NewPayload(), aggregate), 1)
-	defer plant.Stop()
+	pl := mesh.NewPayload("counted", 0)
+	behavior := behaviors.NewAggregatorBehavior(pl, aggregator)
+	tester := func(evt *mesh.Event) bool {
+		switch evt.Topic() {
+		case behaviors.TopicResetted:
+			return true
+		case behaviors.TopicAggregated:
+			counted, err := evt.IntAt("counted")
+			assert.NoError(err)
+			assert.True(counted <= count)
+		}
+		return false
+	}
+	tb := mesh.NewTestbed(behavior, tester)
 
 	for i := 0; i < count; i++ {
 		topic := generator.Word()
-		plant.Emit(event.New(topic))
+		tb.Emit(mesh.NewEvent(topic))
 	}
+	tb.Emit(mesh.NewEvent(behaviors.TopicReset))
 
-	pl, plc := event.NewReplyPayload()
-	plant.Emit(event.New(event.TopicStatus, pl))
-
-	select {
-	case pl := <-plc:
-		topics := pl.At("topics").AsString("")
-		splitted := strings.Split(topics, "/")
-		assert.Length(splitted, count+1)
-	case <-time.After(5 * time.Second):
-		assert.Fail("timeout")
-	}
-
-	plant.AssertLength(0, count)
+	err := tb.Wait(time.Second)
+	assert.NoError(err)
 }
 
 // EOF

@@ -47,15 +47,16 @@ func (b *aggregatorBehavior) Go(cell mesh.Cell, in mesh.Receptor, out mesh.Emitt
 			return nil
 		case evt := <-in.Pull():
 			switch evt.Topic() {
-			case "reset!":
+			case TopicReset:
 				b.data = nil
+				out.Emit(mesh.NewEvent(TopicResetted))
 			default:
 				data, err := b.aggregate(b.data, evt)
 				if err != nil {
 					return err
 				}
 				b.data = data
-				if err := out.Emit(mesh.NewEvent(TopicAggregated, KeyData, b.data)); err != nil {
+				if err := out.Emit(mesh.NewEvent(TopicAggregated, b.data)); err != nil {
 					return err
 				}
 			}

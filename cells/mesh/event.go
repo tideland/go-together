@@ -238,8 +238,17 @@ func NewEvent(topic string, kvs ...interface{}) *Event {
 	evt := &Event{
 		timestamp: time.Now().UTC(),
 		topic:     topic,
-		payload:   NewPayload(kvs...),
 	}
+	// Check if the only value is a payload.
+	if len(kvs) == 1 {
+		pl, ok := kvs[0].(*Payload)
+		if ok {
+			evt.payload = pl
+			return evt
+		}
+	}
+	// Parse keys and values.
+	evt.payload = NewPayload(kvs...)
 	return evt
 }
 

@@ -15,6 +15,7 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 const (
 	TopicAggregated = "aggregated"
 	TopicReset      = "reset!"
+	TopicResetted   = "resetted"
 
 	KeyData = "data"
 )
