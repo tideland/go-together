@@ -17,6 +17,7 @@ import (
 
 	"tideland.dev/go/audit/asserts"
 	"tideland.dev/go/audit/generators"
+
 	"tideland.dev/go/together/cells/behaviors"
 	"tideland.dev/go/together/cells/mesh"
 )
@@ -25,9 +26,9 @@ import (
 // TESTS
 //--------------------
 
-// TestAggregatorBehavior tests the aggregator behavior. Scenario
-// is simply to concatenate the random topics to the passed in topics in
-// the payload at "topic".
+// TestAggregatorBehavior tests the aggregator behavior. Aggreting will
+// here simply be the counting of events, the mitting of this value will
+// be tested.
 func TestAggregatorBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	generator := generators.New(generators.FixedRand())
