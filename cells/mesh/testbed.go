@@ -14,12 +14,41 @@ package mesh // import "tideland.dev/go/together/cells/mesh"
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 )
 
 //--------------------
 // TESTBED HELPERS
 //--------------------
+
+// testbedMesh implements the Mesh interface.
+type testbedMesh struct{}
+
+// Go implements mesh.Mesh and always returns an error.
+func (tbm testbedMesh) Go(name string, b Behavior) error {
+	return fmt.Errorf("cell name %q already used", name)
+}
+
+// Subscribe implements mesh.Mesh and always returns an error.
+func (tbm testbedMesh) Subscribe(emitterName, receptorName string) error {
+	return fmt.Errorf("emitter cell %q does not exist", emitterName)
+}
+
+// Unsubscribe implements mesh.Mesh and always returns an error.
+func (tbm testbedMesh) Unsubscribe(emitterName, receptorName string) error {
+	return fmt.Errorf("emitter cell %q does not exist", emitterName)
+}
+
+// Emit implements mesh.Mesh and always returns an error.
+func (tbm testbedMesh) Emit(name string, evt *Event) error {
+	return fmt.Errorf("cell %q does not exist", name)
+}
+
+// Emitter implements mesh.Mesh and always returns an error.
+func (tbm testbedMesh) Emitter(name string) (Emitter, error) {
+	return nil, fmt.Errorf("cell %q does not exist", name)
+}
 
 // testbedCell runs the behavior and provides the needed interfaces.
 type testbedCell struct {
@@ -53,8 +82,7 @@ func (tbc *testbedCell) Name() string {
 
 // Mesh imepelements mesh.Cell.
 func (tbc *testbedCell) Mesh() Mesh {
-	// TODO Return Mesh implementation.
-	return nil
+	return testbedMesh{}
 }
 
 // Pull implements mesh.Receptor.
@@ -72,8 +100,15 @@ func (tbc *testbedCell) Emit(evt *Event) error {
 // TESTBED
 //--------------------
 
-// Testbed provides a simple environment for the testing of
-// individual behaviors.
+// Testbed provides a simple environment for the testing of individual behaviors.
+// So retrieving the Mesh by the Cell is possible, but using its methods leads to
+// errors. Integration tests have to be done differently.
+//
+// A tester function given when the testbed is started allows to evaluate the
+// events emitted by the behavior. As long as the tests aren't done the function
+// has to return false. Once returning true for the final tested event
+// Testbed.Wait() gets a signal. Otherwise a timeout will be returned to show
+// an internal error.
 type Testbed struct {
 	ctx    context.Context
 	cancel func()
@@ -81,10 +116,8 @@ type Testbed struct {
 	cell   *testbedCell
 }
 
-// NewTestbed creates a testbed for the given behavior. The tester function has
-// to test the emitted events. Once the final test is done and a criteria is
-// fullfilled the tester function has to return true. This signals the Wait()
-// method a positive end. Otherwise a timeout will returned.
+// NewTestbed starts a test cell with the given behavior. The tester function
+// will be called for each event emitted by the behavior.
 func NewTestbed(behavior Behavior, tester func(evt *Event) bool) *Testbed {
 	ctx, cancel := context.WithCancel(context.Background())
 	tb := &Testbed{

@@ -25,13 +25,13 @@ type Mesh interface {
 	// Go starts a cell using the given behavior.
 	Go(name string, b Behavior) error
 
-	// Subscribe subscribes the cell with from name to the cell
-	// with to name.
-	Subscribe(fromName, toName string) error
+	// Subscribe subscribes the cell with receptor name to the cell
+	// with emitter name.
+	Subscribe(emitterName, receptorName string) error
 
-	// Unsubscribe unsubscribes the cell with to name from the cell
-	// with from name.
-	Unsubscribe(toName, fromName string) error
+	// Unsubscribe unsubscribes the cell with receptor name from the cell
+	// with emitter name.
+	Unsubscribe(emitterName, receptorName string) error
 
 	// Emit raises an event to the named cell.
 	Emit(name string, evt *Event) error
