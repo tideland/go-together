@@ -87,13 +87,13 @@ func TestMeshSubscriptions(t *testing.T) {
 
 	// Both cells do not exist.
 	err := msh.Subscribe("forwarder", "collector-a")
-	assert.ErrorContains(err, "cell \"forwarder\" does not exist")
+	assert.ErrorContains(err, "cell 'forwarder' does not exist")
 
 	msh.Go("forwarder", mesh.BehaviorFunc(forwardFunc))
 
 	// One cell do not exist.
 	err = msh.Subscribe("forwarder", "collector-a")
-	assert.ErrorContains(err, "cell \"collector-a\" does not exist")
+	assert.ErrorContains(err, "cell 'collector-a' does not exist")
 
 	// Both cells exist.
 	msh.Go("collector-a", mesh.BehaviorFunc(collectFunc))
@@ -121,7 +121,7 @@ func TestMeshSubscriptions(t *testing.T) {
 
 	// Unsubscribe not existing cell.
 	err = msh.Unsubscribe("forwarder", "dont-exist")
-	assert.ErrorContains(err, "cell \"dont-exist\" does not exist")
+	assert.ErrorContains(err, "cell 'dont-exist' does not exist")
 
 	// Unsubscribe not subscribed cell.
 	err = msh.Unsubscribe("forwarder", "collector-a")
@@ -155,7 +155,7 @@ func TestMeshEmit(t *testing.T) {
 	}
 	msh := mesh.New(ctx)
 	err := msh.Emit("testing", mesh.NewEvent("one"))
-	assert.ErrorContains(err, "cell \"testing\" does not exist")
+	assert.ErrorContains(err, "cell 'testing' does not exist")
 
 	msh.Go("testing", mesh.BehaviorFunc(behaviorFunc))
 
@@ -192,7 +192,7 @@ func TestMeshEmitter(t *testing.T) {
 	}
 	msh := mesh.New(ctx)
 	emtr, err := msh.Emitter("testing")
-	assert.ErrorContains(err, "cell \"testing\" does not exist")
+	assert.ErrorContains(err, "cell 'testing' does not exist")
 
 	msh.Go("testing", mesh.BehaviorFunc(behaviorFunc))
 	emtr, err = msh.Emitter("testing")

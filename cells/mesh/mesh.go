@@ -45,7 +45,7 @@ func (m *mesh) Go(name string, b Behavior) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.cells[name] != nil {
-		return fmt.Errorf("cell name %q already used", name)
+		return fmt.Errorf("cell name '%s' already used", name)
 	}
 	m.cells[name] = newCell(m.ctx, name, m, b, func() {
 		// Callback for cell to unregister.
@@ -64,10 +64,10 @@ func (m *mesh) Subscribe(emitterName, receptorName string) error {
 	emitterCell := m.cells[emitterName]
 	receptorCell := m.cells[receptorName]
 	if emitterCell == nil {
-		return fmt.Errorf("emitter cell %q does not exist", emitterName)
+		return fmt.Errorf("emitter cell '%s' does not exist", emitterName)
 	}
 	if receptorCell == nil {
-		return fmt.Errorf("receptor cell %q does not exist", receptorName)
+		return fmt.Errorf("receptor cell '%s' does not exist", receptorName)
 	}
 	receptorCell.subscribeTo(emitterCell)
 	return nil
@@ -80,10 +80,10 @@ func (m *mesh) Unsubscribe(emitterName, receptorName string) error {
 	emitterCell := m.cells[emitterName]
 	receptorCell := m.cells[receptorName]
 	if emitterCell == nil {
-		return fmt.Errorf("emitter cell %q does not exist", emitterName)
+		return fmt.Errorf("emitter cell '%s' does not exist", emitterName)
 	}
 	if receptorCell == nil {
-		return fmt.Errorf("receptor cell %q does not exist", receptorName)
+		return fmt.Errorf("receptor cell '%s' does not exist", receptorName)
 	}
 	receptorCell.unsubscribeFrom(emitterCell)
 	return nil
@@ -95,7 +95,7 @@ func (m *mesh) Emit(name string, evt *Event) error {
 	defer m.mu.RUnlock()
 	emitCell := m.cells[name]
 	if emitCell == nil {
-		return fmt.Errorf("cell %q does not exist", name)
+		return fmt.Errorf("cell '%s' does not exist", name)
 	}
 	return emitCell.in.Emit(evt)
 }
@@ -106,7 +106,7 @@ func (m *mesh) Emitter(name string) (Emitter, error) {
 	defer m.mu.Unlock()
 	emitCell := m.cells[name]
 	if emitCell == nil {
-		return nil, fmt.Errorf("cell %q does not exist", name)
+		return nil, fmt.Errorf("cell '%s' does not exist", name)
 	}
 	namedEmitter := m.emitters[name]
 	if namedEmitter == nil {

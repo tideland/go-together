@@ -27,27 +27,27 @@ type testbedMesh struct{}
 
 // Go implements mesh.Mesh and always returns an error.
 func (tbm testbedMesh) Go(name string, b Behavior) error {
-	return fmt.Errorf("cell name %q already used", name)
+	return fmt.Errorf("cell name '%s' already used", name)
 }
 
 // Subscribe implements mesh.Mesh and always returns an error.
 func (tbm testbedMesh) Subscribe(emitterName, receptorName string) error {
-	return fmt.Errorf("emitter cell %q does not exist", emitterName)
+	return fmt.Errorf("emitter cell '%s' does not exist", emitterName)
 }
 
 // Unsubscribe implements mesh.Mesh and always returns an error.
 func (tbm testbedMesh) Unsubscribe(emitterName, receptorName string) error {
-	return fmt.Errorf("emitter cell %q does not exist", emitterName)
+	return fmt.Errorf("emitter cell '%s' does not exist", emitterName)
 }
 
 // Emit implements mesh.Mesh and always returns an error.
 func (tbm testbedMesh) Emit(name string, evt *Event) error {
-	return fmt.Errorf("cell %q does not exist", name)
+	return fmt.Errorf("cell '%s' does not exist", name)
 }
 
 // Emitter implements mesh.Mesh and always returns an error.
 func (tbm testbedMesh) Emitter(name string) (Emitter, error) {
-	return nil, fmt.Errorf("cell %q does not exist", name)
+	return nil, fmt.Errorf("cell '%s' does not exist", name)
 }
 
 // testbedCell runs the behavior and provides the needed interfaces.
