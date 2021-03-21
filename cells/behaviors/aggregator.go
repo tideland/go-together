@@ -21,21 +21,23 @@ import (
 
 // Aggregator is a function receiving the current aggregated payload
 // and event and returns the next aggregated payload.
-type Aggregator func(data *mesh.Payload, evt *mesh.Event) (*mesh.Payload, error)
+type Aggregator func(aggregate interface{}, evt *mesh.Event) (interface{}, error)
 
 // aggregatorBehavior implements the aggregator behavior.
 type aggregatorBehavior struct {
-	data      *mesh.Payload
-	aggregate Aggregator
+	initial    interface{}
+	aggregate  interface{}
+	aggregator Aggregator
 }
 
 // NewAggregatorBehavior creates a behavior aggregating the received events
 // and emits events with the new aggregate. A "reset!" topic resets the
 // aggregate to nil again.
-func NewAggregatorBehavior(data *mesh.Payload, aggregator Aggregator) mesh.Behavior {
+func NewAggregatorBehavior(aggregate interface{}, aggregator Aggregator) mesh.Behavior {
 	return &aggregatorBehavior{
-		data:      data,
-		aggregate: aggregator,
+		initial:    aggregate,
+		aggregate:  aggregate,
+		aggregator: aggregator,
 	}
 }
 
@@ -47,18 +49,24 @@ func (b *aggregatorBehavior) Go(cell mesh.Cell, in mesh.Receptor, out mesh.Emitt
 			return nil
 		case evt := <-in.Pull():
 			switch evt.Topic() {
+			case TopicAggregate:
+				// Request aggregated.
+				if err := out.Emit(TopicAggregated, b.aggregate); err != nil {
+					return err
+				}
 			case TopicReset:
-				b.data = nil
-				out.Emit(mesh.NewEvent(TopicResetted))
+				// Reset to initial value.
+				b.aggregate = b.initial
+				if err := out.Emit(TopicResetted); err != nil {
+					return err
+				}
 			default:
-				data, err := b.aggregate(b.data, evt)
+				// Aggregate the event.
+				aggregate, err := b.aggregator(b.aggregate, evt)
 				if err != nil {
 					return err
 				}
-				b.data = data
-				if err := out.Emit(mesh.NewEvent(TopicAggregated, b.data)); err != nil {
-					return err
-				}
+				b.aggregate = aggregate
 			}
 		}
 	}

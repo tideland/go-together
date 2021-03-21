@@ -32,7 +32,7 @@ func TestTestbed(t *testing.T) {
 			case <-cell.Context().Done():
 				return nil
 			case evt := <-in.Pull():
-				out.Emit(evt)
+				out.EmitEvent(evt)
 			}
 		}
 	}
@@ -49,9 +49,9 @@ func TestTestbed(t *testing.T) {
 
 	tb := mesh.NewTestbed(behavior, tester)
 
-	tb.Emit(mesh.NewEvent("one"))
-	tb.Emit(mesh.NewEvent("two"))
-	tb.Emit(mesh.NewEvent("three"))
+	tb.Emit("one")
+	tb.Emit("two")
+	tb.Emit("three")
 
 	err := tb.Wait(time.Second)
 	assert.NoError(err)
@@ -69,28 +69,28 @@ func TestTestbedMesh(t *testing.T) {
 			case evt := <-in.Pull():
 				switch evt.Topic() {
 				case "go":
-					out.Emit(evt)
+					out.EmitEvent(evt)
 					err := cell.Mesh().Go("anything", nil)
 					assert.ErrorContains(err, "cell name 'anything' already used")
 				case "subscribe":
-					out.Emit(evt)
+					out.EmitEvent(evt)
 					err := cell.Mesh().Subscribe("anything", "anything-else")
 					assert.ErrorContains(err, "emitter cell 'anything' does not exist")
 				case "unsubscribe":
-					out.Emit(evt)
+					out.EmitEvent(evt)
 					err := cell.Mesh().Unsubscribe("anything", "anything-else")
 					assert.ErrorContains(err, "emitter cell 'anything' does not exist")
 				case "emit":
-					out.Emit(evt)
-					err := cell.Mesh().Emit("anything", evt)
+					out.EmitEvent(evt)
+					err := cell.Mesh().EmitEvent("anything", evt)
 					assert.ErrorContains(err, "cell 'anything' does not exist")
 				case "emitter":
-					out.Emit(evt)
+					out.EmitEvent(evt)
 					emtr, err := cell.Mesh().Emitter("anything")
 					assert.ErrorContains(err, "cell 'anything' does not exist")
 					assert.Nil(emtr)
 				case "done":
-					out.Emit(evt)
+					out.EmitEvent(evt)
 				}
 			}
 		}
@@ -104,12 +104,12 @@ func TestTestbedMesh(t *testing.T) {
 
 	tb := mesh.NewTestbed(behavior, tester)
 
-	tb.Emit(mesh.NewEvent("go"))
-	tb.Emit(mesh.NewEvent("subscribe"))
-	tb.Emit(mesh.NewEvent("unsubscribe"))
-	tb.Emit(mesh.NewEvent("emit"))
-	tb.Emit(mesh.NewEvent("emitter"))
-	tb.Emit(mesh.NewEvent("done"))
+	tb.Emit("go")
+	tb.Emit("subscribe")
+	tb.Emit("unsubscribe")
+	tb.Emit("emit")
+	tb.Emit("emitter")
+	tb.Emit("done")
 
 	err := tb.Wait(time.Second)
 	assert.NoError(err)

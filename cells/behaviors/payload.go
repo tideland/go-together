@@ -8,16 +8,15 @@
 package behaviors // import "tideland.dev/go/together/cells/behaviors"
 
 //--------------------
-// TOPICS AMD KEYS
+// TOPICS
 //--------------------
 
-// Standard topics and keys.
+// Standard topics.
 const (
+	TopicAggregate  = "aggregate!"
 	TopicAggregated = "aggregated"
 	TopicReset      = "reset!"
 	TopicResetted   = "resetted"
-
-	KeyData = "data"
 )
 
 // EOF

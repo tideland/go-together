@@ -41,7 +41,16 @@ func (tbm testbedMesh) Unsubscribe(emitterName, receptorName string) error {
 }
 
 // Emit implements mesh.Mesh and always returns an error.
-func (tbm testbedMesh) Emit(name string, evt *Event) error {
+func (tbm testbedMesh) Emit(name, topic string, payloads ...interface{}) error {
+	evt, err := NewEvent(topic, payloads...)
+	if err != nil {
+		return err
+	}
+	return tbm.EmitEvent(name, evt)
+}
+
+// EmitEvent implements mesh.Mesh and always returns an error.
+func (tbm testbedMesh) EmitEvent(name string, evt *Event) error {
 	return fmt.Errorf("cell '%s' does not exist", name)
 }
 
@@ -66,7 +75,7 @@ func goTestbedCell(ctx context.Context, behavior Behavior) *testbedCell {
 		inc:      make(chan *Event),
 		outc:     make(chan *Event),
 	}
-	go tbc.behavior.Go(tbc, tbc, tbc)
+	go tbc.backend()
 	return tbc
 }
 
@@ -91,9 +100,34 @@ func (tbc *testbedCell) Pull() <-chan *Event {
 }
 
 // Emit implements mesh.Emitter.
-func (tbc *testbedCell) Emit(evt *Event) error {
+func (tbc *testbedCell) Emit(topic string, payloads ...interface{}) error {
+	evt, err := NewEvent(topic, payloads...)
+	if err != nil {
+		return err
+	}
+	return tbc.EmitEvent(evt)
+}
+
+// EmitEvent implements mesh.Emitter.
+func (tbc *testbedCell) EmitEvent(evt *Event) error {
 	tbc.outc <- evt
 	return nil
+}
+
+// backend runs the behavior to test.
+func (tbc *testbedCell) backend() {
+	if err := tbc.behavior.Go(tbc, tbc, tbc); err != nil {
+		// Notify subscribers about error.
+		tbc.Emit(TopicError, PayloadCellError{
+			CellName: tbc.Name(),
+			Error:    err.Error(),
+		})
+	} else {
+		// Notify subscribers about termination.
+		tbc.Emit(TopicTerminated, PayloadTermination{
+			CellName: tbc.Name(),
+		})
+	}
 }
 
 //--------------------
@@ -141,19 +175,31 @@ func NewTestbed(behavior Behavior, tester func(evt *Event) bool) *Testbed {
 	return tb
 }
 
+// Emit creates an event and sends it to the behavior.
+func (tb *Testbed) Emit(topic string, payloads ...interface{}) error {
+	evt, err := NewEvent(topic, payloads...)
+	if err != nil {
+		return err
+	}
+	tb.EmitEvent(evt)
+	return nil
+}
+
 // Emit sends an event to the behavior.
-func (tb *Testbed) Emit(evt *Event) {
+func (tb *Testbed) EmitEvent(evt *Event) {
 	tb.cell.inc <- evt
 }
 
 // Wait waits until test ends or a timeout.
 func (tb *Testbed) Wait(timeout time.Duration) error {
 	defer tb.cancel()
+	now := time.Now()
 	select {
 	case <-tb.donec:
 		return nil
 	case to := <-time.After(timeout):
-		return errors.New("timeout after " + to.String())
+		waited := to.Sub(now)
+		return errors.New("timeout after " + waited.String())
 	}
 }
 

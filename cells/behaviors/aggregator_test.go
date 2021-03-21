@@ -12,11 +12,11 @@ package behaviors_test // import "tideland.dev/go/together/cells/behaviors"
 //--------------------
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
 	"tideland.dev/go/audit/asserts"
-	"tideland.dev/go/audit/generators"
 
 	"tideland.dev/go/together/cells/behaviors"
 	"tideland.dev/go/together/cells/mesh"
@@ -31,34 +31,34 @@ import (
 // be tested.
 func TestAggregatorBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	generator := generators.New(generators.FixedRand())
 	count := 50
-	aggregator := func(data *mesh.Payload, evt *mesh.Event) (*mesh.Payload, error) {
-		counted, err := data.IntAt("counted")
-		assert.NoError(err)
-		counted++
-		return mesh.NewPayload("counted", counted), nil
+	aggregator := func(aggregate interface{}, evt *mesh.Event) (interface{}, error) {
+		words := aggregate.(map[string]bool)
+		words[evt.Topic()] = true
+		return words, nil
 	}
-	pl := mesh.NewPayload("counted", 0)
-	behavior := behaviors.NewAggregatorBehavior(pl, aggregator)
+	behavior := behaviors.NewAggregatorBehavior(map[string]bool{}, aggregator)
 	tester := func(evt *mesh.Event) bool {
 		switch evt.Topic() {
 		case behaviors.TopicResetted:
 			return true
 		case behaviors.TopicAggregated:
-			counted, err := evt.IntAt("counted")
+			var words map[string]bool
+			err := evt.Payload(&words)
 			assert.NoError(err)
-			assert.True(counted <= count)
+			assert.Length(words, count)
 		}
 		return false
 	}
 	tb := mesh.NewTestbed(behavior, tester)
 
+	// Run the test.
 	for i := 0; i < count; i++ {
-		topic := generator.Word()
-		tb.Emit(mesh.NewEvent(topic))
+		topic := strconv.Itoa(i)
+		tb.Emit(topic)
 	}
-	tb.Emit(mesh.NewEvent(behaviors.TopicReset))
+	tb.Emit(behaviors.TopicAggregate)
+	tb.Emit(behaviors.TopicReset)
 
 	err := tb.Wait(time.Second)
 	assert.NoError(err)

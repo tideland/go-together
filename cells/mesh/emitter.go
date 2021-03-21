@@ -18,8 +18,17 @@ type emitter struct {
 }
 
 // Emit implements Emitter.
-func (e *emitter) Emit(evt *Event) error {
-	return e.strean.Emit(evt)
+func (e *emitter) Emit(topic string, payloads ...interface{}) error {
+	evt, err := NewEvent(topic, payloads)
+	if err != nil {
+		return err
+	}
+	return e.EmitEvent(evt)
+}
+
+// EmitEvent implements Emitter.
+func (e *emitter) EmitEvent(evt *Event) error {
+	return e.strean.EmitEvent(evt)
 }
 
 // EOF

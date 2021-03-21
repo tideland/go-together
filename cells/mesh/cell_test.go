@@ -42,9 +42,9 @@ func TestCellSimple(t *testing.T) {
 	tbCollector := NewRequestBehavior(collector)
 	cCollector := newCell(ctx, "collector", meshStub{}, tbCollector, drop)
 
-	cCollector.in.Emit(NewEvent("one"))
-	cCollector.in.Emit(NewEvent("two"))
-	cCollector.in.Emit(NewEvent("three"))
+	cCollector.in.Emit("one")
+	cCollector.in.Emit("two")
+	cCollector.in.Emit("three")
 
 	assert.WaitClosed(sigc, time.Second)
 	assert.Length(topics, 3)
@@ -62,7 +62,7 @@ func TestCellChain(t *testing.T) {
 	sigc := make(chan interface{})
 	upcaser := func(cell Cell, evt *Event, out Emitter) error {
 		upperTopic := strings.ToUpper(evt.Topic())
-		out.Emit(NewEvent(upperTopic))
+		out.Emit(upperTopic)
 		return nil
 	}
 	tbUpcaser := NewRequestBehavior(upcaser)
@@ -78,9 +78,9 @@ func TestCellChain(t *testing.T) {
 	cCollector := newCell(ctx, "collector", meshStub{}, tbCollector, drop)
 	cCollector.subscribeTo(cUpcaser)
 
-	cUpcaser.in.Emit(NewEvent("one"))
-	cUpcaser.in.Emit(NewEvent("two"))
-	cUpcaser.in.Emit(NewEvent("three"))
+	cUpcaser.in.Emit("one")
+	cUpcaser.in.Emit("two")
+	cUpcaser.in.Emit("three")
 
 	assert.WaitClosed(sigc, time.Second)
 	assert.Length(topics, 3)
@@ -88,9 +88,9 @@ func TestCellChain(t *testing.T) {
 
 	cCollector.unsubscribeFrom(cUpcaser)
 
-	cUpcaser.in.Emit(NewEvent("FOUR"))
-	cUpcaser.in.Emit(NewEvent("FIVE"))
-	cUpcaser.in.Emit(NewEvent("SIX"))
+	cUpcaser.in.Emit("FOUR")
+	cUpcaser.in.Emit("FIVE")
+	cUpcaser.in.Emit("SIX")
 
 	assert.Length(topics, 3)
 	assert.Equal(strings.Join(topics, " "), "ONE TWO THREE")
@@ -107,7 +107,7 @@ func TestCellAutoUnsubscribe(t *testing.T) {
 	collected := []*Event{}
 	sigc := make(chan interface{})
 	forwarder := func(cell Cell, evt *Event, out Emitter) error {
-		return out.Emit(evt)
+		return out.EmitEvent(evt)
 	}
 	cForwarderA := newCell(ctx, "forwarderA", meshStub{}, NewRequestBehavior(forwarder), drop)
 	cForwarderB := newCell(ctx, "forwarderB", meshStub{}, NewRequestBehavior(forwarder), drop)
@@ -116,7 +116,7 @@ func TestCellAutoUnsubscribe(t *testing.T) {
 		if len(failed) == 3 {
 			return errors.New("done")
 		}
-		return out.Emit(evt)
+		return out.EmitEvent(evt)
 	}
 	cFailer := newCell(ctx, "failer", meshStub{}, NewRequestBehavior(failer), drop)
 	cFailer.subscribeTo(cForwarderA)
@@ -131,23 +131,24 @@ func TestCellAutoUnsubscribe(t *testing.T) {
 	cCollector := newCell(ctx, "collector", meshStub{}, NewRequestBehavior(collector), drop)
 	cCollector.subscribeTo(cFailer)
 
-	cForwarderA.in.Emit(NewEvent("foo"))
-	cForwarderB.in.Emit(NewEvent("bar"))
-	cForwarderA.in.Emit(NewEvent("baz"))
+	cForwarderA.in.Emit("foo")
+	cForwarderB.in.Emit("bar")
+	cForwarderA.in.Emit("baz")
 
 	assert.WaitClosed(sigc, time.Second)
 
-	cForwarderA.in.Emit(NewEvent("dont-care"))
-	cForwarderB.in.Emit(NewEvent("dont-care"))
+	cForwarderA.in.Emit("dont-care")
+	cForwarderB.in.Emit("dont-care")
 
 	foundc := make(chan interface{})
 
-	for _, event := range collected {
-		if event.Topic() == TopicError {
-			name, _ := event.StringAt(KeyName)
-			assert.Equal(name, "failer")
-			message, _ := event.StringAt(KeyMessage)
-			assert.Equal(message, "done")
+	for _, evt := range collected {
+		if evt.Topic() == TopicError {
+			var errpl PayloadCellError
+			err := evt.Payload(&errpl)
+			assert.NoError(err)
+			assert.Equal(errpl.CellName, "failer")
+			assert.Equal(errpl.Error, "done")
 			close(foundc)
 			break
 		}
@@ -176,7 +177,11 @@ func (ms meshStub) Unsubscribe(toName, fromName string) error {
 	return nil
 }
 
-func (ms meshStub) Emit(name string, evt *Event) error {
+func (ms meshStub) Emit(name, topic string, payloads ...interface{}) error {
+	return nil
+}
+
+func (ms meshStub) EmitEvent(name string, evt *Event) error {
 	return nil
 }
 

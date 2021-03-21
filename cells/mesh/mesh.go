@@ -90,14 +90,23 @@ func (m *mesh) Unsubscribe(emitterName, receptorName string) error {
 }
 
 // Emit implements Mesh.
-func (m *mesh) Emit(name string, evt *Event) error {
+func (m *mesh) Emit(name, topic string, payloads ...interface{}) error {
+	evt, err := NewEvent(topic, payloads...)
+	if err != nil {
+		return err
+	}
+	return m.EmitEvent(name, evt)
+}
+
+// EmitEvent implements Mesh.
+func (m *mesh) EmitEvent(name string, evt *Event) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	emitCell := m.cells[name]
 	if emitCell == nil {
 		return fmt.Errorf("cell '%s' does not exist", name)
 	}
-	return emitCell.in.Emit(evt)
+	return emitCell.in.EmitEvent(evt)
 }
 
 // Emitter implements Mesh.

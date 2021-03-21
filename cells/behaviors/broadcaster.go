@@ -34,7 +34,7 @@ func (b *broadcasterBehavior) Go(cell mesh.Cell, in mesh.Receptor, out mesh.Emit
 		case <-cell.Context().Done():
 			return nil
 		case evt := <-in.Pull():
-			if err := out.Emit(evt); err != nil {
+			if err := out.EmitEvent(evt); err != nil {
 				return err
 			}
 		}

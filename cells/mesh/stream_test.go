@@ -49,7 +49,7 @@ func TestStreamSimple(t *testing.T) {
 
 	for i := 0; i < 20; i++ {
 		topic := topics[i%len(topics)]
-		err := str.Emit(NewEvent(topic, nil))
+		err := str.Emit(topic)
 		assert.NoError(err)
 	}
 

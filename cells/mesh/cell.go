@@ -102,10 +102,15 @@ func (c *cell) backend() {
 	}()
 	if err := c.behavior.Go(c, c.in, c.out); err != nil {
 		// Notify subscribers about error.
-		c.out.Emit(NewEvent(TopicError, KeyName, c.name, KeyMessage, err.Error()))
+		c.out.Emit(TopicError, PayloadCellError{
+			CellName: c.name,
+			Error:    err.Error(),
+		})
 	} else {
 		// Notify subscribers about termination.
-		c.out.Emit(NewEvent(TopicTerminated, KeyName, c.name))
+		c.out.Emit(TopicTerminated, PayloadTermination{
+			CellName: c.name,
+		})
 	}
 }
 

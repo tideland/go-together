@@ -30,8 +30,11 @@ type Receptor interface {
 // Emitter defines the interface for emitting events to one
 // or more cells.
 type Emitter interface {
-	// Emit appends an event to the end of the output stream.
-	Emit(evt *Event) error
+	// Emit creates a new event and appends it to the output stream.
+	Emit(topic string, payloads ...interface{}) error
+
+	// EmitEvent appends the given event to the output stream.
+	EmitEvent(evt *Event) error
 }
 
 //--------------------
@@ -55,11 +58,20 @@ func (str *stream) Pull() <-chan *Event {
 	return str.eventc
 }
 
-// Emit appends an event to the end of the stream. It retries to
+// Emit creates a new event and emits it.
+func (str *stream) Emit(topic string, payloads ...interface{}) error {
+	evt, err := NewEvent(topic, payloads...)
+	if err != nil {
+		return err
+	}
+	return str.EmitEvent(evt)
+}
+
+// EmitEvent appends an event to the end of the stream. It retries to
 // append it to the buffer in case that it's full. The time will
 // increase. If it lasts too long, about 5 seconds, a timeout
 // error will be returned.
-func (str *stream) Emit(evt *Event) error {
+func (str *stream) EmitEvent(evt *Event) error {
 	wait := 50 * time.Millisecond
 	for {
 		select {
@@ -94,33 +106,43 @@ func newStreams() *streams {
 }
 
 // add add a stream to the set of streams.
-func (s *streams) add(as *stream) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.streams[as] = struct{}{}
+func (strs *streams) add(as *stream) {
+	strs.mu.Lock()
+	defer strs.mu.Unlock()
+	strs.streams[as] = struct{}{}
 }
 
 // remove deletes a stream from the set of streams.
-func (s *streams) remove(rs *stream) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	delete(s.streams, rs)
+func (strs *streams) remove(rs *stream) {
+	strs.mu.Lock()
+	defer strs.mu.Unlock()
+	delete(strs.streams, rs)
 }
 
 // removeAll deletes all streams from the set of streams.
-func (s *streams) removeAll() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.streams = make(map[*stream]struct{})
+func (strs *streams) removeAll() {
+	strs.mu.Lock()
+	defer strs.mu.Unlock()
+	strs.streams = make(map[*stream]struct{})
 }
 
-// Emit appends the given event to the end of all contained
+// Emit creates a new event and appends it to the end of all
+// contained streams.
+func (strs *streams) Emit(topic string, payloads ...interface{}) error {
+	evt, err := NewEvent(topic, payloads...)
+	if err != nil {
+		return err
+	}
+	return strs.EmitEvent(evt)
+}
+
+// EmitEvent appends the given event to the end of all contained
 // streams.
-func (s *streams) Emit(evt *Event) error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	for es := range s.streams {
-		if err := es.Emit(evt); err != nil {
+func (strs *streams) EmitEvent(evt *Event) error {
+	strs.mu.RLock()
+	defer strs.mu.RUnlock()
+	for es := range strs.streams {
+		if err := es.EmitEvent(evt); err != nil {
 			return err
 		}
 	}

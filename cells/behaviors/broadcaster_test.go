@@ -40,10 +40,10 @@ func TestBroadcasterBehavior(t *testing.T) {
 	}
 	tb := mesh.NewTestbed(behavior, tester)
 
-	tb.Emit(mesh.NewEvent("one"))
-	tb.Emit(mesh.NewEvent("two"))
-	tb.Emit(mesh.NewEvent("three"))
-	tb.Emit(mesh.NewEvent("done"))
+	tb.Emit("one")
+	tb.Emit("two")
+	tb.Emit("three")
+	tb.Emit("done")
 
 	err := tb.Wait(time.Second)
 	assert.NoError(err)
