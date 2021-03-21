@@ -25,8 +25,7 @@ import (
 // TESTS
 //--------------------
 
-// TestBroadcasterBehavior tests the broadcaster behavior. It simple receives some
-// events and checks if those have been emitted again.
+// TestBroadcasterBehavior tests the broadcaster behavior.
 func TestBroadcasterBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	behavior := behaviors.NewBroadcasterBehavior()
@@ -40,6 +39,8 @@ func TestBroadcasterBehavior(t *testing.T) {
 	}
 	tb := mesh.NewTestbed(behavior, tester)
 
+	// Run the tests and check if the emitted events have
+	// been collected.
 	tb.Emit("one")
 	tb.Emit("two")
 	tb.Emit("three")

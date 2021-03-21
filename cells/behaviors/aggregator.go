@@ -19,21 +19,21 @@ import (
 // AGGREGATOR BEHAVIOR
 //--------------------
 
-// Aggregator is a function receiving the current aggregated payload
+// AggregatorFunc is a function receiving the current aggregated payload
 // and event and returns the next aggregated payload.
-type Aggregator func(aggregate interface{}, evt *mesh.Event) (interface{}, error)
+type AggregatorFunc func(aggregate interface{}, evt *mesh.Event) (interface{}, error)
 
 // aggregatorBehavior implements the aggregator behavior.
 type aggregatorBehavior struct {
 	initial    interface{}
 	aggregate  interface{}
-	aggregator Aggregator
+	aggregator AggregatorFunc
 }
 
 // NewAggregatorBehavior creates a behavior aggregating the received events
 // and emits events with the new aggregate. A "reset!" topic resets the
 // aggregate to nil again.
-func NewAggregatorBehavior(aggregate interface{}, aggregator Aggregator) mesh.Behavior {
+func NewAggregatorBehavior(aggregate interface{}, aggregator AggregatorFunc) mesh.Behavior {
 	return &aggregatorBehavior{
 		initial:    aggregate,
 		aggregate:  aggregate,

@@ -26,37 +26,36 @@ import (
 // TESTS
 //--------------------
 
-// TestAggregatorBehavior tests the aggregator behavior.
-func TestAggregatorBehavior(t *testing.T) {
+// TestCallbackBehavior tests the callback behavior.
+func TestCallbackBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	count := 50
-	aggregator := func(aggregate interface{}, evt *mesh.Event) (interface{}, error) {
-		words := aggregate.(map[string]bool)
-		words[evt.Topic()] = true
-		return words, nil
+	countA := 0
+	countB := 0
+	callbackA := func(evt *mesh.Event, out mesh.Emitter) error {
+		return out.Emit("a")
 	}
-	behavior := behaviors.NewAggregatorBehavior(map[string]bool{}, aggregator)
+	callbackB := func(evt *mesh.Event, out mesh.Emitter) error {
+		return out.Emit("b")
+	}
+	behavior := behaviors.NewCallbackBehavior(callbackA, callbackB)
 	tester := func(evt *mesh.Event) bool {
 		switch evt.Topic() {
-		case behaviors.TopicResetted:
-			return true
-		case behaviors.TopicAggregated:
-			var words map[string]bool
-			err := evt.Payload(&words)
-			assert.NoError(err)
-			assert.Length(words, count)
+		case "a":
+			countA++
+		case "b":
+			countB++
 		}
-		return false
+		return countA == countB && countA == count
 	}
 	tb := mesh.NewTestbed(behavior, tester)
 
-	// Run the tests and check if length of aggregated words matches.
+	// Run the tests and check if the number of calls
+	// of both callbacks.
 	for i := 0; i < count; i++ {
 		topic := strconv.Itoa(i)
 		tb.Emit(topic)
 	}
-	tb.Emit(behaviors.TopicAggregate)
-	tb.Emit(behaviors.TopicReset)
 
 	err := tb.Wait(time.Second)
 	assert.NoError(err)
