@@ -13,6 +13,7 @@ package mesh // import "tideland.dev/go/together/cells/mesh"
 
 // Standard topics.
 const (
+	TopicNil        = "(nil)"
 	TopicTerminated = "terminated"
 	TopicError      = "error"
 )

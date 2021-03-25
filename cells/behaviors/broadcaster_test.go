@@ -30,7 +30,7 @@ func TestBroadcasterBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	behavior := behaviors.NewBroadcasterBehavior()
 	topics := make(map[string]bool)
-	tester := func(evt *mesh.Event) bool {
+	tester := func(evt mesh.Event) bool {
 		if evt.Topic() == "done" {
 			return true
 		}

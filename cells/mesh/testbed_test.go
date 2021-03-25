@@ -38,7 +38,7 @@ func TestTestbed(t *testing.T) {
 	}
 	behavior := mesh.BehaviorFunc(forwarder)
 	count := 0
-	tester := func(evt *mesh.Event) bool {
+	tester := func(evt mesh.Event) bool {
 		count++
 		if count == 3 {
 			// Done.
@@ -97,7 +97,7 @@ func TestTestbedMesh(t *testing.T) {
 	}
 	behavior := mesh.BehaviorFunc(mesher)
 	topics := map[string]bool{}
-	tester := func(evt *mesh.Event) bool {
+	tester := func(evt mesh.Event) bool {
 		topics[evt.Topic()] = true
 		return len(topics) == 6
 	}

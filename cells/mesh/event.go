@@ -30,12 +30,22 @@ type Event struct {
 	payload   []byte
 }
 
-// NewEvent creates a new event based on a topic. The payloads are optional.
-func NewEvent(topic string, payloads ...interface{}) (*Event, error) {
-	evt := &Event{
-		timestamp: time.Now().UTC(),
-		topic:     topic,
+// nilEvent is returned in case of errors.
+var nilEvent = Event{topic: TopicNil}
+
+// IsNilEvent checks if an event is the nil event.
+func IsNilEvent(evt Event) bool {
+	return evt.topic == TopicNil
+}
+
+// NewEvent creates a new Event based on a topic. The payloads are optional.
+func NewEvent(topic string, payloads ...interface{}) (Event, error) {
+	evt := nilEvent
+	if topic == "" {
+		return evt, fmt.Errorf("event needs topic")
 	}
+	evt.timestamp = time.Now().UTC()
+	evt.topic = topic
 	// Check if the only value is a payload.
 	switch len(payloads) {
 	case 0:
@@ -43,13 +53,13 @@ func NewEvent(topic string, payloads ...interface{}) (*Event, error) {
 	case 1:
 		bs, err := json.Marshal(payloads[0])
 		if err != nil {
-			return nil, fmt.Errorf("cannot marshal payload: %v", err)
+			return evt, fmt.Errorf("cannot marshal payload: %v", err)
 		}
 		evt.payload = bs
 	default:
 		bs, err := json.Marshal(payloads)
 		if err != nil {
-			return nil, fmt.Errorf("cannot marshal payload: %v", err)
+			return evt, fmt.Errorf("cannot marshal payload: %v", err)
 		}
 		evt.payload = bs
 	}
@@ -57,24 +67,24 @@ func NewEvent(topic string, payloads ...interface{}) (*Event, error) {
 }
 
 // Timestamp returns the event timestamp.
-func (evt *Event) Timestamp() time.Time {
+func (evt Event) Timestamp() time.Time {
 	return evt.timestamp
 }
 
 // Topic returns the event topic.
-func (evt *Event) Topic() string {
+func (evt Event) Topic() string {
 	return evt.topic
 }
 
 // HasPayload checks if the event contains a payload.
-func (evt *Event) HasPayload() bool {
+func (evt Event) HasPayload() bool {
 	return evt.payload != nil
 }
 
 // Payload unmarshals the payload of the event.
-func (evt *Event) Payload(payload interface{}) error {
+func (evt Event) Payload(payload interface{}) error {
 	if evt.payload == nil {
-		return fmt.Errorf("event contains no payload")
+		return fmt.Errorf("Event contains no payload")
 	}
 	err := json.Unmarshal(evt.payload, payload)
 	if err != nil {
@@ -84,8 +94,11 @@ func (evt *Event) Payload(payload interface{}) error {
 }
 
 // String implements fmt.Stringer.
-func (evt *Event) String() string {
-	return fmt.Sprintf("Event{Topic:%v Payload:%v}", evt.topic, string(evt.payload))
+func (evt Event) String() string {
+	return fmt.Sprintf(
+		"Event{Timestamp:%s Topic:%v Payload:%v}",
+		evt.timestamp.Format(time.RFC3339Nano), evt.topic, string(evt.payload),
+	)
 }
 
 // EOF

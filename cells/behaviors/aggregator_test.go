@@ -30,13 +30,13 @@ import (
 func TestAggregatorBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	count := 50
-	aggregator := func(aggregate interface{}, evt *mesh.Event) (interface{}, error) {
+	aggregator := func(aggregate interface{}, evt mesh.Event) (interface{}, error) {
 		words := aggregate.(map[string]bool)
 		words[evt.Topic()] = true
 		return words, nil
 	}
 	behavior := behaviors.NewAggregatorBehavior(map[string]bool{}, aggregator)
-	tester := func(evt *mesh.Event) bool {
+	tester := func(evt mesh.Event) bool {
 		switch evt.Topic() {
 		case behaviors.TopicResetted:
 			return true

@@ -37,7 +37,7 @@ type Mesh interface {
 	Emit(name, topic string, payloads ...interface{}) error
 
 	// EmitEvent raises an event to the named cell.
-	EmitEvent(name string, evt *Event) error
+	EmitEvent(name string, evt Event) error
 
 	// Emitter returns a static emitter for the named cell.
 	Emitter(name string) (Emitter, error)
@@ -102,7 +102,7 @@ func (bf BehaviorFunc) Go(cell Cell, in Receptor, out Emitter) error {
 
 // RequestFunc defines a function signature for the request
 // behavior. It is called per received event.
-type RequestFunc func(cell Cell, evt *Event, out Emitter) error
+type RequestFunc func(cell Cell, evt Event, out Emitter) error
 
 // RequestBehavior is a simple behavior using a function
 // to process the received events.

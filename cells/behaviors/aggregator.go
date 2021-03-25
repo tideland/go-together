@@ -21,7 +21,7 @@ import (
 
 // AggregatorFunc is a function receiving the current aggregated payload
 // and event and returns the next aggregated payload.
-type AggregatorFunc func(aggregate interface{}, evt *mesh.Event) (interface{}, error)
+type AggregatorFunc func(aggregate interface{}, evt mesh.Event) (interface{}, error)
 
 // aggregatorBehavior implements the aggregator behavior.
 type aggregatorBehavior struct {

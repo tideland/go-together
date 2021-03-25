@@ -20,7 +20,7 @@ import (
 //--------------------
 
 // CallbackFunc is a function called by the behavior when it receives an event.
-type CallbackFunc func(evt *mesh.Event, out mesh.Emitter) error
+type CallbackFunc func(evt mesh.Event, out mesh.Emitter) error
 
 // callbackBehavior implements the aggregator behavior.
 type callbackBehavior struct {

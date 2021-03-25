@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"tideland.dev/go/audit/asserts"
+
 	"tideland.dev/go/together/cells/mesh"
 )
 
@@ -26,7 +27,11 @@ import (
 func TestEventSimple(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	payloadIn := []string{"a", "b", "c"}
-	evt, err := mesh.NewEvent("test-a")
+	evt, err := mesh.NewEvent("")
+	assert.ErrorContains(err, "event needs topic")
+	assert.True(mesh.IsNilEvent(evt))
+
+	evt, err = mesh.NewEvent("test-a")
 
 	assert.NoError(err)
 	assert.Equal(evt.Topic(), "test-a")

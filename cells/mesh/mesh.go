@@ -99,7 +99,7 @@ func (m *mesh) Emit(name, topic string, payloads ...interface{}) error {
 }
 
 // EmitEvent implements Mesh.
-func (m *mesh) EmitEvent(name string, evt *Event) error {
+func (m *mesh) EmitEvent(name string, evt Event) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	emitCell := m.cells[name]

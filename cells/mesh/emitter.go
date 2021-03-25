@@ -27,7 +27,7 @@ func (e *emitter) Emit(topic string, payloads ...interface{}) error {
 }
 
 // EmitEvent implements Emitter.
-func (e *emitter) EmitEvent(evt *Event) error {
+func (e *emitter) EmitEvent(evt Event) error {
 	return e.strean.EmitEvent(evt)
 }
 

@@ -50,7 +50,7 @@ func (tbm testbedMesh) Emit(name, topic string, payloads ...interface{}) error {
 }
 
 // EmitEvent implements mesh.Mesh and always returns an error.
-func (tbm testbedMesh) EmitEvent(name string, evt *Event) error {
+func (tbm testbedMesh) EmitEvent(name string, evt Event) error {
 	return fmt.Errorf("cell '%s' does not exist", name)
 }
 
@@ -63,8 +63,8 @@ func (tbm testbedMesh) Emitter(name string) (Emitter, error) {
 type testbedCell struct {
 	ctx      context.Context
 	behavior Behavior
-	inc      chan *Event
-	outc     chan *Event
+	inc      chan Event
+	outc     chan Event
 }
 
 // goTestbedCell initializes the testbed cell and spawns the goroutine.
@@ -72,8 +72,8 @@ func goTestbedCell(ctx context.Context, behavior Behavior) *testbedCell {
 	tbc := &testbedCell{
 		ctx:      ctx,
 		behavior: behavior,
-		inc:      make(chan *Event),
-		outc:     make(chan *Event),
+		inc:      make(chan Event),
+		outc:     make(chan Event),
 	}
 	go tbc.backend()
 	return tbc
@@ -95,7 +95,7 @@ func (tbc *testbedCell) Mesh() Mesh {
 }
 
 // Pull implements mesh.Receptor.
-func (tbc *testbedCell) Pull() <-chan *Event {
+func (tbc *testbedCell) Pull() <-chan Event {
 	return tbc.inc
 }
 
@@ -109,7 +109,7 @@ func (tbc *testbedCell) Emit(topic string, payloads ...interface{}) error {
 }
 
 // EmitEvent implements mesh.Emitter.
-func (tbc *testbedCell) EmitEvent(evt *Event) error {
+func (tbc *testbedCell) EmitEvent(evt Event) error {
 	tbc.outc <- evt
 	return nil
 }
@@ -152,7 +152,7 @@ type Testbed struct {
 
 // NewTestbed starts a test cell with the given behavior. The tester function
 // will be called for each event emitted by the behavior.
-func NewTestbed(behavior Behavior, tester func(evt *Event) bool) *Testbed {
+func NewTestbed(behavior Behavior, tester func(evt Event) bool) *Testbed {
 	ctx, cancel := context.WithCancel(context.Background())
 	tb := &Testbed{
 		ctx:    ctx,
@@ -186,7 +186,7 @@ func (tb *Testbed) Emit(topic string, payloads ...interface{}) error {
 }
 
 // Emit sends an event to the behavior.
-func (tb *Testbed) EmitEvent(evt *Event) {
+func (tb *Testbed) EmitEvent(evt Event) {
 	tb.cell.inc <- evt
 }
 
