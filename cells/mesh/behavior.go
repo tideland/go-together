@@ -5,7 +5,7 @@
 // All rights reserved. Use of this source code is governed
 // by the new BSD license.
 
-package mesh
+package mesh // import "tideland.dev/go/together/cells/mesh"
 
 //--------------------
 // IMPORT
@@ -25,16 +25,19 @@ type Mesh interface {
 	// Go starts a cell using the given behavior.
 	Go(name string, b Behavior) error
 
-	// Subscribe subscribes the cell with from name to the cell
-	// with to name.
-	Subscribe(fromName, toName string) error
+	// Subscribe subscribes the cell with receptor name to the cell
+	// with emitter name.
+	Subscribe(emitterName, receptorName string) error
 
-	// Unsubscribe unsubscribes the cell with to name from the cell
-	// with from name.
-	Unsubscribe(toName, fromName string) error
+	// Unsubscribe unsubscribes the cell with receptor name from the cell
+	// with emitter name.
+	Unsubscribe(emitterName, receptorName string) error
 
-	// Emit raises an event to the named cell.
-	Emit(name string, evt *Event) error
+	// Emit creates an event and raises it to the named cell.
+	Emit(name, topic string, payloads ...interface{}) error
+
+	// EmitEvent raises an event to the named cell.
+	EmitEvent(name string, evt Event) error
 
 	// Emitter returns a static emitter for the named cell.
 	Emitter(name string) (Emitter, error)
@@ -68,6 +71,17 @@ type Behavior interface {
 	// of the implementation to run a select loop, receive incomming
 	// events via the input queue, and emit events via the output queue
 	// if needed.
+	//
+	//     for {
+	//         select {
+	//         case <-cell.Context().Done():
+	//             return nil
+	//         case evt := <-in.Pull():
+	//             ...
+	//             out.Emit(mesh.NewVent("my-topic", "x", 12345))
+	//         }
+	//     }
+	//
 	Go(cell Cell, in Receptor, out Emitter) error
 }
 
@@ -88,7 +102,7 @@ func (bf BehaviorFunc) Go(cell Cell, in Receptor, out Emitter) error {
 
 // RequestFunc defines a function signature for the request
 // behavior. It is called per received event.
-type RequestFunc func(cell Cell, evt *Event, out Emitter) error
+type RequestFunc func(cell Cell, evt Event, out Emitter) error
 
 // RequestBehavior is a simple behavior using a function
 // to process the received events.

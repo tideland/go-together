@@ -5,7 +5,7 @@
 // All rights reserved. Use of this source code is governed
 // by the new BSD license.
 
-package mesh
+package mesh // import "tideland.dev/go/together/cells/mesh"
 
 //--------------------
 // IMPORTS
@@ -49,7 +49,7 @@ func TestStreamSimple(t *testing.T) {
 
 	for i := 0; i < 20; i++ {
 		topic := topics[i%len(topics)]
-		err := str.Emit(NewEvent(topic, nil))
+		err := str.Emit(topic)
 		assert.NoError(err)
 	}
 

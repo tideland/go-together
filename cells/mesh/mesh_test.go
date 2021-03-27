@@ -5,7 +5,7 @@
 // All rights reserved. Use of this source code is governed
 // by the new BSD license.
 
-package mesh_test
+package mesh_test // import "tideland.dev/go/together/cells/mesh"
 
 //--------------------
 // IMPORTS
@@ -65,7 +65,7 @@ func TestMeshSubscriptions(t *testing.T) {
 			case <-cell.Context().Done():
 				return nil
 			case evt := <-in.Pull():
-				out.Emit(evt)
+				out.EmitEvent(evt)
 			}
 		}
 	}
@@ -87,22 +87,22 @@ func TestMeshSubscriptions(t *testing.T) {
 
 	// Both cells do not exist.
 	err := msh.Subscribe("forwarder", "collector-a")
-	assert.ErrorContains(err, "cell \"forwarder\" does not exist")
+	assert.ErrorContains(err, "cell 'forwarder' does not exist")
 
 	msh.Go("forwarder", mesh.BehaviorFunc(forwardFunc))
 
 	// One cell do not exist.
 	err = msh.Subscribe("forwarder", "collector-a")
-	assert.ErrorContains(err, "cell \"collector-a\" does not exist")
+	assert.ErrorContains(err, "cell 'collector-a' does not exist")
 
 	// Both cells exist.
 	msh.Go("collector-a", mesh.BehaviorFunc(collectFunc))
 	err = msh.Subscribe("forwarder", "collector-a")
 	assert.NoError(err)
 
-	msh.Emit("forwarder", mesh.NewEvent("one"))
-	msh.Emit("forwarder", mesh.NewEvent("two"))
-	msh.Emit("forwarder", mesh.NewEvent("three"))
+	msh.Emit("forwarder", "one")
+	msh.Emit("forwarder", "two")
+	msh.Emit("forwarder", "three")
 
 	assert.Wait(sigc, 3, time.Second)
 
@@ -113,15 +113,15 @@ func TestMeshSubscriptions(t *testing.T) {
 	err = msh.Subscribe("forwarder", "collector-b")
 	assert.NoError(err)
 
-	msh.Emit("forwarder", mesh.NewEvent("one"))
-	msh.Emit("forwarder", mesh.NewEvent("two"))
-	msh.Emit("forwarder", mesh.NewEvent("three"))
+	msh.Emit("forwarder", "one")
+	msh.Emit("forwarder", "two")
+	msh.Emit("forwarder", "three")
 
 	assert.Wait(sigc, 3, time.Second)
 
 	// Unsubscribe not existing cell.
 	err = msh.Unsubscribe("forwarder", "dont-exist")
-	assert.ErrorContains(err, "cell \"dont-exist\" does not exist")
+	assert.ErrorContains(err, "cell 'dont-exist' does not exist")
 
 	// Unsubscribe not subscribed cell.
 	err = msh.Unsubscribe("forwarder", "collector-a")
@@ -154,17 +154,17 @@ func TestMeshEmit(t *testing.T) {
 		}
 	}
 	msh := mesh.New(ctx)
-	err := msh.Emit("testing", mesh.NewEvent("one"))
-	assert.ErrorContains(err, "cell \"testing\" does not exist")
+	err := msh.Emit("testing", "one")
+	assert.ErrorContains(err, "cell 'testing' does not exist")
 
 	msh.Go("testing", mesh.BehaviorFunc(behaviorFunc))
 
-	err = msh.Emit("testing", mesh.NewEvent("one"))
+	err = msh.Emit("testing", "one")
 	assert.NoError(err)
 
-	msh.Emit("testing", mesh.NewEvent("two"))
-	msh.Emit("testing", mesh.NewEvent("three"))
-	msh.Emit("testing", mesh.NewEvent("get-i"))
+	msh.Emit("testing", "two")
+	msh.Emit("testing", "three")
+	msh.Emit("testing", "get-i")
 
 	assert.Wait(sigc, 4, time.Second)
 
@@ -192,16 +192,16 @@ func TestMeshEmitter(t *testing.T) {
 	}
 	msh := mesh.New(ctx)
 	emtr, err := msh.Emitter("testing")
-	assert.ErrorContains(err, "cell \"testing\" does not exist")
+	assert.ErrorContains(err, "cell 'testing' does not exist")
 
 	msh.Go("testing", mesh.BehaviorFunc(behaviorFunc))
 	emtr, err = msh.Emitter("testing")
 	assert.NoError(err)
 
-	emtr.Emit(mesh.NewEvent("one"))
-	emtr.Emit(mesh.NewEvent("two"))
-	emtr.Emit(mesh.NewEvent("three"))
-	emtr.Emit(mesh.NewEvent("get-i"))
+	emtr.Emit("one")
+	emtr.Emit("two")
+	emtr.Emit("three")
+	emtr.Emit("get-i")
 
 	assert.Wait(sigc, 4, time.Second)
 

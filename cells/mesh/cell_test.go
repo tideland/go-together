@@ -5,7 +5,7 @@
 // All rights reserved. Use of this source code is governed
 // by the new BSD license.
 
-package mesh
+package mesh // import "tideland.dev/go/together/cells/mesh"
 
 //--------------------
 // IMPORTS
@@ -32,7 +32,7 @@ func TestCellSimple(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	topics := []string{}
 	sigc := make(chan interface{})
-	collector := func(cell Cell, evt *Event, out Emitter) error {
+	collector := func(cell Cell, evt Event, out Emitter) error {
 		topics = append(topics, evt.Topic())
 		if len(topics) == 3 {
 			close(sigc)
@@ -42,9 +42,9 @@ func TestCellSimple(t *testing.T) {
 	tbCollector := NewRequestBehavior(collector)
 	cCollector := newCell(ctx, "collector", meshStub{}, tbCollector, drop)
 
-	cCollector.in.Emit(NewEvent("one"))
-	cCollector.in.Emit(NewEvent("two"))
-	cCollector.in.Emit(NewEvent("three"))
+	cCollector.in.Emit("one")
+	cCollector.in.Emit("two")
+	cCollector.in.Emit("three")
 
 	assert.WaitClosed(sigc, time.Second)
 	assert.Length(topics, 3)
@@ -60,14 +60,14 @@ func TestCellChain(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	topics := []string{}
 	sigc := make(chan interface{})
-	upcaser := func(cell Cell, evt *Event, out Emitter) error {
+	upcaser := func(cell Cell, evt Event, out Emitter) error {
 		upperTopic := strings.ToUpper(evt.Topic())
-		out.Emit(NewEvent(upperTopic))
+		out.Emit(upperTopic)
 		return nil
 	}
 	tbUpcaser := NewRequestBehavior(upcaser)
 	cUpcaser := newCell(ctx, "upcaser", meshStub{}, tbUpcaser, drop)
-	collector := func(cell Cell, evt *Event, out Emitter) error {
+	collector := func(cell Cell, evt Event, out Emitter) error {
 		topics = append(topics, evt.Topic())
 		if len(topics) == 3 {
 			close(sigc)
@@ -78,9 +78,9 @@ func TestCellChain(t *testing.T) {
 	cCollector := newCell(ctx, "collector", meshStub{}, tbCollector, drop)
 	cCollector.subscribeTo(cUpcaser)
 
-	cUpcaser.in.Emit(NewEvent("one"))
-	cUpcaser.in.Emit(NewEvent("two"))
-	cUpcaser.in.Emit(NewEvent("three"))
+	cUpcaser.in.Emit("one")
+	cUpcaser.in.Emit("two")
+	cUpcaser.in.Emit("three")
 
 	assert.WaitClosed(sigc, time.Second)
 	assert.Length(topics, 3)
@@ -88,9 +88,9 @@ func TestCellChain(t *testing.T) {
 
 	cCollector.unsubscribeFrom(cUpcaser)
 
-	cUpcaser.in.Emit(NewEvent("FOUR"))
-	cUpcaser.in.Emit(NewEvent("FIVE"))
-	cUpcaser.in.Emit(NewEvent("SIX"))
+	cUpcaser.in.Emit("FOUR")
+	cUpcaser.in.Emit("FIVE")
+	cUpcaser.in.Emit("SIX")
 
 	assert.Length(topics, 3)
 	assert.Equal(strings.Join(topics, " "), "ONE TWO THREE")
@@ -103,25 +103,25 @@ func TestCellChain(t *testing.T) {
 func TestCellAutoUnsubscribe(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	ctx, cancel := context.WithCancel(context.Background())
-	failed := []*Event{}
-	collected := []*Event{}
+	failed := []Event{}
+	collected := []Event{}
 	sigc := make(chan interface{})
-	forwarder := func(cell Cell, evt *Event, out Emitter) error {
-		return out.Emit(evt)
+	forwarder := func(cell Cell, evt Event, out Emitter) error {
+		return out.EmitEvent(evt)
 	}
 	cForwarderA := newCell(ctx, "forwarderA", meshStub{}, NewRequestBehavior(forwarder), drop)
 	cForwarderB := newCell(ctx, "forwarderB", meshStub{}, NewRequestBehavior(forwarder), drop)
-	failer := func(cell Cell, evt *Event, out Emitter) error {
+	failer := func(cell Cell, evt Event, out Emitter) error {
 		failed = append(failed, evt)
 		if len(failed) == 3 {
 			return errors.New("done")
 		}
-		return out.Emit(evt)
+		return out.EmitEvent(evt)
 	}
 	cFailer := newCell(ctx, "failer", meshStub{}, NewRequestBehavior(failer), drop)
 	cFailer.subscribeTo(cForwarderA)
 	cFailer.subscribeTo(cForwarderB)
-	collector := func(cell Cell, evt *Event, out Emitter) error {
+	collector := func(cell Cell, evt Event, out Emitter) error {
 		collected = append(collected, evt)
 		if len(collected) == 3 {
 			close(sigc)
@@ -131,23 +131,24 @@ func TestCellAutoUnsubscribe(t *testing.T) {
 	cCollector := newCell(ctx, "collector", meshStub{}, NewRequestBehavior(collector), drop)
 	cCollector.subscribeTo(cFailer)
 
-	cForwarderA.in.Emit(NewEvent("foo"))
-	cForwarderB.in.Emit(NewEvent("bar"))
-	cForwarderA.in.Emit(NewEvent("baz"))
+	cForwarderA.in.Emit("foo")
+	cForwarderB.in.Emit("bar")
+	cForwarderA.in.Emit("baz")
 
 	assert.WaitClosed(sigc, time.Second)
 
-	cForwarderA.in.Emit(NewEvent("dont-care"))
-	cForwarderB.in.Emit(NewEvent("dont-care"))
+	cForwarderA.in.Emit("dont-care")
+	cForwarderB.in.Emit("dont-care")
 
 	foundc := make(chan interface{})
 
-	for _, event := range collected {
-		if event.Topic() == ErrorTopic {
-			name, _ := event.StringAt(NameKey)
-			assert.Equal(name, "failer")
-			message, _ := event.StringAt(MessageKey)
-			assert.Equal(message, "done")
+	for _, evt := range collected {
+		if evt.Topic() == TopicError {
+			var errpl PayloadCellError
+			err := evt.Payload(&errpl)
+			assert.NoError(err)
+			assert.Equal(errpl.CellName, "failer")
+			assert.Equal(errpl.Error, "done")
 			close(foundc)
 			break
 		}
@@ -176,7 +177,11 @@ func (ms meshStub) Unsubscribe(toName, fromName string) error {
 	return nil
 }
 
-func (ms meshStub) Emit(name string, evt *Event) error {
+func (ms meshStub) Emit(name, topic string, payloads ...interface{}) error {
+	return nil
+}
+
+func (ms meshStub) EmitEvent(name string, evt Event) error {
 	return nil
 }
 

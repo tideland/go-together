@@ -5,7 +5,7 @@
 // All rights reserved. Use of this source code is governed
 // by the new BSD license.
 
-package mesh
+package mesh // import "tideland.dev/go/together/cells/mesh"
 
 //--------------------
 // IMPORT
@@ -45,7 +45,7 @@ func (m *mesh) Go(name string, b Behavior) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.cells[name] != nil {
-		return fmt.Errorf("cell name %q already used", name)
+		return fmt.Errorf("cell name '%s' already used", name)
 	}
 	m.cells[name] = newCell(m.ctx, name, m, b, func() {
 		// Callback for cell to unregister.
@@ -64,10 +64,10 @@ func (m *mesh) Subscribe(emitterName, receptorName string) error {
 	emitterCell := m.cells[emitterName]
 	receptorCell := m.cells[receptorName]
 	if emitterCell == nil {
-		return fmt.Errorf("emitter cell %q does not exist", emitterName)
+		return fmt.Errorf("emitter cell '%s' does not exist", emitterName)
 	}
 	if receptorCell == nil {
-		return fmt.Errorf("receptor cell %q does not exist", receptorName)
+		return fmt.Errorf("receptor cell '%s' does not exist", receptorName)
 	}
 	receptorCell.subscribeTo(emitterCell)
 	return nil
@@ -80,24 +80,33 @@ func (m *mesh) Unsubscribe(emitterName, receptorName string) error {
 	emitterCell := m.cells[emitterName]
 	receptorCell := m.cells[receptorName]
 	if emitterCell == nil {
-		return fmt.Errorf("emitter cell %q does not exist", emitterName)
+		return fmt.Errorf("emitter cell '%s' does not exist", emitterName)
 	}
 	if receptorCell == nil {
-		return fmt.Errorf("receptor cell %q does not exist", receptorName)
+		return fmt.Errorf("receptor cell '%s' does not exist", receptorName)
 	}
 	receptorCell.unsubscribeFrom(emitterCell)
 	return nil
 }
 
 // Emit implements Mesh.
-func (m *mesh) Emit(name string, evt *Event) error {
+func (m *mesh) Emit(name, topic string, payloads ...interface{}) error {
+	evt, err := NewEvent(topic, payloads...)
+	if err != nil {
+		return err
+	}
+	return m.EmitEvent(name, evt)
+}
+
+// EmitEvent implements Mesh.
+func (m *mesh) EmitEvent(name string, evt Event) error {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	emitCell := m.cells[name]
 	if emitCell == nil {
-		return fmt.Errorf("cell %q does not exist", name)
+		return fmt.Errorf("cell '%s' does not exist", name)
 	}
-	return emitCell.in.Emit(evt)
+	return emitCell.in.EmitEvent(evt)
 }
 
 // Emitter implements Mesh.
@@ -106,7 +115,7 @@ func (m *mesh) Emitter(name string) (Emitter, error) {
 	defer m.mu.Unlock()
 	emitCell := m.cells[name]
 	if emitCell == nil {
-		return nil, fmt.Errorf("cell %q does not exist", name)
+		return nil, fmt.Errorf("cell '%s' does not exist", name)
 	}
 	namedEmitter := m.emitters[name]
 	if namedEmitter == nil {
