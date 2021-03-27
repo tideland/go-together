@@ -15,6 +15,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -61,7 +62,7 @@ type Actor struct {
 	syncActions  chan Action
 	repairer     Repairer
 	finalizer    Finalizer
-	works        bool
+	works        atomic.Value
 	err          error
 }
 
@@ -70,8 +71,8 @@ func Go(options ...Option) (*Actor, error) {
 	// Init with options.
 	act := &Actor{
 		syncActions: make(chan Action),
-		works:       true,
 	}
+	act.works.Store(true)
 	for _, option := range options {
 		if err := option(act); err != nil {
 			return nil, err
@@ -111,7 +112,7 @@ func (act *Actor) DoAsyncTimeout(action Action, timeout time.Duration) error {
 		act.mu.Unlock()
 		return act.err
 	}
-	if !act.works {
+	if !act.works.Load().(bool) {
 		act.mu.Unlock()
 		return fmt.Errorf("actor doesn't work anymore")
 	}
@@ -138,7 +139,7 @@ func (act *Actor) DoSyncTimeout(action Action, timeout time.Duration) error {
 		act.mu.Unlock()
 		return act.err
 	}
-	if !act.works {
+	if !act.works.Load().(bool) {
 		act.mu.Unlock()
 		return fmt.Errorf("actor doesn't work anymore")
 	}
@@ -156,7 +157,7 @@ func (act *Actor) DoSyncTimeout(action Action, timeout time.Duration) error {
 	select {
 	case <-done:
 	case <-time.After(timeout):
-		if !act.works {
+		if !act.works.Load().(bool) {
 			return act.err
 		}
 		return fmt.Errorf("timeout")
@@ -175,11 +176,11 @@ func (act *Actor) Err() error {
 func (act *Actor) Stop() {
 	act.mu.Lock()
 	defer act.mu.Unlock()
-	if !act.works {
+	if !act.works.Load().(bool) {
 		// Already stopped.
 		return
 	}
-	act.works = false
+	act.works.Store(false)
 	act.cancel()
 }
 
@@ -187,7 +188,7 @@ func (act *Actor) Stop() {
 func (act *Actor) backend(started chan struct{}) {
 	defer act.finalize()
 	close(started)
-	for act.works {
+	for act.works.Load().(bool) {
 		act.work()
 	}
 }
@@ -204,13 +205,13 @@ func (act *Actor) work() {
 			err := act.repairer(reason)
 			act.mu.Lock()
 			act.err = err
-			act.works = act.err == nil
+			act.works.Store(act.err == nil)
 			act.mu.Unlock()
 		case reason != nil && act.repairer == nil:
 			// Accept panic.
 			act.mu.Lock()
 			act.err = fmt.Errorf("actor panic: %v", reason)
-			act.works = false
+			act.works.Store(false)
 			act.mu.Unlock()
 		}
 	}()
