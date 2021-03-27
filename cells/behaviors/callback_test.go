@@ -1,6 +1,6 @@
-// Tideland Go Together - Cells - Behaviors - Unit Tests
+// Tideland Go Together - Cells - Behaviors
 //
-// Copyright (C) 2010-2020 Frank Mueller / Tideland / Oldenburg / Germany
+// Copyright (C) 2010-2021 Frank Mueller / Tideland / Oldenburg / Germany
 //
 // All rights reserved. Use of this source code is governed
 // by the new BSD license.
@@ -12,11 +12,13 @@ package behaviors_test // import "tideland.dev/go/together/cells/behaviors"
 //--------------------
 
 import (
+	"strconv"
 	"testing"
+	"time"
 
 	"tideland.dev/go/audit/asserts"
+
 	"tideland.dev/go/together/cells/behaviors"
-	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
 )
 
@@ -27,27 +29,36 @@ import (
 // TestCallbackBehavior tests the callback behavior.
 func TestCallbackBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	cbfA := func(emitter mesh.Emitter, evt *event.Event) error {
-		return emitter.Emit("0", evt)
+	count := 50
+	countA := 0
+	countB := 0
+	callbackA := func(evt mesh.Event, out mesh.Emitter) error {
+		return out.Emit("a")
 	}
-	cbfB := func(emitter mesh.Emitter, evt *event.Event) error {
-		return emitter.Emit("1", evt)
+	callbackB := func(evt mesh.Event, out mesh.Emitter) error {
+		return out.Emit("b")
 	}
-	cbfC := func(emitter mesh.Emitter, evt *event.Event) error {
-		if err := emitter.Emit("0", evt); err != nil {
-			return err
+	behavior := behaviors.NewCallbackBehavior(callbackA, callbackB)
+	tester := func(evt mesh.Event) bool {
+		switch evt.Topic() {
+		case "a":
+			countA++
+		case "b":
+			countB++
 		}
-		return emitter.Emit("1", evt)
+		return countA == countB && countA == count
 	}
-	plant := mesh.NewTestPlant(assert, behaviors.NewCallbackBehavior("cb", cbfA, cbfB, cbfC), 2)
-	defer plant.Stop()
+	tb := mesh.NewTestbed(behavior, tester)
 
-	plant.Emit(event.New("foo"))
-	plant.Emit(event.New("bar"))
-	plant.Emit(event.New("baz"))
+	// Run the tests and check if the number of calls
+	// of both callbacks.
+	for i := 0; i < count; i++ {
+		topic := strconv.Itoa(i)
+		tb.Emit(topic)
+	}
 
-	plant.AssertLength(0, 6)
-	plant.AssertLength(1, 6)
+	err := tb.Wait(time.Second)
+	assert.NoError(err)
 }
 
 // EOF

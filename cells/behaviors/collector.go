@@ -1,6 +1,6 @@
 // Tideland Go Together - Cells - Behaviors
 //
-// Copyright (C) 2010-2020 Frank Mueller / Tideland / Oldenburg / Germany
+// Copyright (C) 2010-2021 Frank Mueller / Tideland / Oldenburg / Germany
 //
 // All rights reserved. Use of this source code is governed
 // by the new BSD license.
@@ -11,74 +11,56 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 // IMPORTS
 //--------------------
 
-import (
-	"tideland.dev/go/together/cells/event"
-	"tideland.dev/go/together/cells/mesh"
-	"tideland.dev/go/together/fuse"
-)
+import "tideland.dev/go/together/cells/mesh"
 
 //--------------------
 // COLLECTOR BEHAVIOR
 //--------------------
 
-// collectorBehavior collects events for debugging.
+// CollectionProcessorFunc is used to process collected events.
+type CollectionProcessorFunc func(r mesh.EventSinkReader) (mesh.Event, error)
+
+// collectorBehavior collects events for processing on demand.
 type collectorBehavior struct {
-	id      string
-	emitter mesh.Emitter
 	max     int
-	sink    *event.Sink
-	process event.SinkProcessor
+	sink    *mesh.EventSink
+	process CollectionProcessorFunc
 }
 
-// NewCollectorBehavior creates a collector behavior. It collects
-// a maximum number of events, each event is passed through. If the
-// maximum number is 0 it collects until the topic "reset". After
-// receiving the topic "process" the processor will be called and
-// the collected events will be reset afterwards.
-func NewCollectorBehavior(id string, max int, processor event.SinkProcessor) mesh.Behavior {
+// NewCollectorBehavior collects max events. After "process!" topic it processes
+// it and emits the result as event. After "reset!" topic the collection is dropped
+// to zero.
+func NewCollectorBehavior(max int, process CollectionProcessorFunc) mesh.Behavior {
 	return &collectorBehavior{
-		id:      id,
 		max:     max,
-		process: processor,
+		sink:    mesh.NewEventSink(max),
+		process: process,
 	}
 }
 
-// ID returns the individual identifier of a behavior instance.
-func (b *collectorBehavior) ID() string {
-	return b.id
-}
-
-// Init the behavior.
-func (b *collectorBehavior) Init(emitter mesh.Emitter) error {
-	b.emitter = emitter
-	b.sink = event.NewSink(b.max)
-	return nil
-}
-
-// Terminate the behavior.
-func (b *collectorBehavior) Terminate() error {
-	return b.sink.Clear()
-}
-
-// Process collects, processes, and re-emits events.
-func (b *collectorBehavior) Process(evt *event.Event) {
-	switch evt.Topic() {
-	case event.TopicProcess:
-		pl, err := b.process(b.sink)
-		fuse.Trigger(err)
-		fuse.Trigger(b.emitter.Broadcast(event.New(event.TopicResult, pl)))
-	case event.TopicReset:
-		fuse.Trigger(b.sink.Clear())
-	default:
-		_, err := b.sink.Push(evt)
-		fuse.Trigger(err)
-		fuse.Trigger(b.emitter.Broadcast(evt))
+// Go collects, processes, and resets the collected events.
+func (b *collectorBehavior) Go(cell mesh.Cell, in mesh.Receptor, out mesh.Emitter) error {
+	for {
+		select {
+		case <-cell.Context().Done():
+			return cell.Context().Err()
+		case evt := <-in.Pull():
+			switch evt.Topic() {
+			case TopicReset:
+				b.sink.Clear()
+				out.Emit(TopicResetted)
+			case TopicProcess:
+				pevt, err := b.process(b.sink)
+				if err != nil {
+					return err
+				}
+				out.EmitEvent(pevt)
+				b.sink.Clear()
+			default:
+				b.sink.Push(evt)
+			}
+		}
 	}
-}
-
-// Recover from an error.
-func (b *collectorBehavior) Recover(err interface{}) error {
-	return b.sink.Clear()
 }
 
 // EOF

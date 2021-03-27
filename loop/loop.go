@@ -14,9 +14,8 @@ package loop // import "tideland.dev/go/together/loop"
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
-
-	"tideland.dev/go/together/fuse"
 )
 
 //--------------------
@@ -30,22 +29,16 @@ const timeout = 5 * time.Second
 // FUNCTION TYPES
 //--------------------
 
-// Terminator describes a type signaling that the work is done.
-type Terminator interface {
-	Done() <-chan struct{}
-}
-
 // Worker discribes the function running the loop.
-type Worker func(t Terminator) error
+type Worker func(ctx context.Context) error
 
-// Recoverer allows a goroutine to react on a panic during its
-// work. If it returns nil the goroutine shall continue
-// work. Otherwise it will return with an error the gouroutine
-// may use for its continued processing.
-type Recoverer func(reason interface{}) error
+// Repairer allows the loop goroutine to react on a panic
+// during its work. Returning a nil the loop will be continued
+// by calling the worker again.
+type Repairer func(reason interface{}) error
 
-// Finalizer is called with the actors internal status when
-// the backend loop terminates.
+// Finalizer is called with the final error if the backend
+// loop terminates.
 type Finalizer func(err error) error
 
 //--------------------
@@ -57,13 +50,14 @@ type Finalizer func(err error) error
 // failure as well as control how to stop, restart, or recover via
 // options.
 type Loop struct {
+	mu        sync.Mutex
 	ctx       context.Context
 	cancel    func()
-	signal    *fuse.Signal
 	worker    Worker
-	recoverer Recoverer
+	repairer  Repairer
 	finalizer Finalizer
-	err       fuse.Error
+	works     bool
+	err       error
 }
 
 // Go starts a loop running the given worker with the
@@ -71,97 +65,97 @@ type Loop struct {
 func Go(worker Worker, options ...Option) (*Loop, error) {
 	// Init with default values.
 	l := &Loop{
-		signal: fuse.NewSignal(),
 		worker: worker,
+		works:  true,
 	}
 	for _, option := range options {
 		if err := option(l); err != nil {
 			return nil, err
 		}
 	}
-	// Ensure default settings.
+	// Ensure default settings for context.
 	if l.ctx == nil {
 		l.ctx, l.cancel = context.WithCancel(context.Background())
 	} else {
 		l.ctx, l.cancel = context.WithCancel(l.ctx)
 	}
-	if l.recoverer == nil {
-		l.recoverer = func(reason interface{}) error {
-			return fmt.Errorf("loop panic: %v", reason)
-		}
+	// Start backend.
+	started := make(chan struct{})
+	go l.backend(started)
+	select {
+	case <-started:
+		return l, nil
+	case <-time.After(timeout):
+		return nil, fmt.Errorf("loop starting timeout after %.1f seconds", timeout.Seconds())
 	}
-	if l.finalizer == nil {
-		l.finalizer = func(err error) error {
-			return err
-		}
-	}
-	// Create loop with its options.
-	l.signal.Notify(fuse.Starting)
-	go l.backend()
-	if err := l.signal.Wait(fuse.Ready, timeout); err != nil {
-		return nil, err
-	}
-	return l, nil
 }
 
 // Err returns information if the Loop has an error.
 func (l *Loop) Err() error {
-	return l.err.Get()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.err
 }
 
-// Kill terminates the Loop backend with a given external error.
-func (l *Loop) Kill(err error) error {
-	if !l.err.IsNil() {
-		return l.err.Get()
+// Stop terminates the Loop backend. It works asynchronous as
+// the goroutine may need time for cleanup. Anyone wanting to
+// be notified on state has to handle it in a Finalizer.
+func (l *Loop) Stop() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if !l.works {
+		// Already stopped.
+		return
 	}
-	l.err.Set(err)
 	l.cancel()
-	if err := l.signal.Wait(fuse.Stopped, timeout); err != nil {
-		return err
-	}
-	return l.err.Get()
-}
-
-// Stop terminates the Loop backend.
-func (l *Loop) Stop() error {
-	return l.Kill(nil)
 }
 
 // backend runs the loop worker as goroutine as long as
 // the it isn't terminated or recovery returned false.
-func (l *Loop) backend() {
-	defer func() {
-		l.err.Set(l.finalizer(l.err.Get()))
-		l.signal.Notify(fuse.Stopped)
-	}()
-	l.signal.Notify(fuse.Ready)
-	for l.wrapper() {
+func (l *Loop) backend(started chan struct{}) {
+	defer l.finalize()
+	close(started)
+	for l.works {
+		l.work()
 	}
 }
 
-// wrapper wraps the wrapper, handles possible failure, and
-// manages panics.
-func (l *Loop) wrapper() (ok bool) {
+// work wraps the worker and handles possible panics.
+func (l *Loop) work() {
 	defer func() {
-		if reason := recover(); reason != nil {
-			// Panic!
-			err := l.recoverer(reason)
-			if err != nil {
-				l.err.Set(err)
-				ok = false
-			} else {
-				ok = true
-			}
-		} else {
-			// Regular ending.
-			ok = false
-		}
-		if !ok {
-			l.signal.Notify(fuse.Stopping)
+		// Check and handle panics!
+		reason := recover()
+		switch {
+		case reason != nil && l.repairer != nil:
+			// Try to repair.
+			err := l.repairer(reason)
+			l.mu.Lock()
+			l.err = err
+			l.works = l.err == nil
+			l.mu.Unlock()
+		case reason != nil && l.repairer == nil:
+			// Accept panic.
+			l.mu.Lock()
+			l.err = fmt.Errorf("loop panic: %v", reason)
+			l.works = false
+			l.mu.Unlock()
 		}
 	}()
-	l.err.Set(l.worker(l.ctx))
-	return
+	// Work without panic.
+	err := l.worker(l.ctx)
+	l.mu.Lock()
+	l.err = err
+	l.works = false
+	l.mu.Unlock()
+}
+
+// finalize takes care for a clean loop finalization.
+func (l *Loop) finalize() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.finalizer != nil {
+		l.err = l.finalizer(l.err)
+	}
 }
 
 // EOF

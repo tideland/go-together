@@ -35,13 +35,13 @@ func WithContext(ctx context.Context) Option {
 	}
 }
 
-// WithRecoverer defines the panic handler of a loop.
-func WithRecoverer(recoverer Recoverer) Option {
+// WithRepairer defines the panic handler of a loop.
+func WithRepairer(repairer Repairer) Option {
 	return func(l *Loop) error {
-		if recoverer == nil {
-			return failure.New("invalid loop option: recoverer is nil")
+		if repairer == nil {
+			return failure.New("invalid loop option: repairer is nil")
 		}
-		l.recoverer = recoverer
+		l.repairer = repairer
 		return nil
 	}
 }

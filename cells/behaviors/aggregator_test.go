@@ -1,6 +1,6 @@
-// Tideland Go Together - Cells - Behaviors - Unit Tests
+// Tideland Go Together - Cells - Behaviors
 //
-// Copyright (C) 2010-2020 Frank Mueller / Tideland / Oldenburg / Germany
+// Copyright (C) 2010-2021 Frank Mueller / Tideland / Oldenburg / Germany
 //
 // All rights reserved. Use of this source code is governed
 // by the new BSD license.
@@ -12,14 +12,13 @@ package behaviors_test // import "tideland.dev/go/together/cells/behaviors"
 //--------------------
 
 import (
-	"strings"
+	"strconv"
 	"testing"
 	"time"
 
 	"tideland.dev/go/audit/asserts"
-	"tideland.dev/go/audit/generators"
+
 	"tideland.dev/go/together/cells/behaviors"
-	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
 )
 
@@ -27,40 +26,40 @@ import (
 // TESTS
 //--------------------
 
-// TestAggregatorBehavior tests the aggregator behavior. Scenario
-// is simply to concatenate the random topics to the passed in topics in
-// the payload at "topic".
+// TestAggregatorBehavior tests the aggregator behavior.
 func TestAggregatorBehavior(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	generator := generators.New(generators.FixedRand())
 	count := 50
-	aggregate := func(pl *event.Payload, evt *event.Event) (*event.Payload, error) {
-		topic := evt.Topic()
-		topics := pl.At("topics").AsString("")
-		topics += "/" + topic
-		return event.NewPayload("topics", topics), nil
+	aggregator := func(aggregate interface{}, evt mesh.Event) (interface{}, error) {
+		words := aggregate.(map[string]bool)
+		words[evt.Topic()] = true
+		return words, nil
 	}
-	plant := mesh.NewTestPlant(assert, behaviors.NewAggregatorBehavior("ab", event.NewPayload(), aggregate), 1)
-	defer plant.Stop()
+	behavior := behaviors.NewAggregatorBehavior(map[string]bool{}, aggregator)
+	tester := func(evt mesh.Event) bool {
+		switch evt.Topic() {
+		case behaviors.TopicResetted:
+			return true
+		case behaviors.TopicAggregated:
+			var words map[string]bool
+			err := evt.Payload(&words)
+			assert.NoError(err)
+			assert.Length(words, count)
+		}
+		return false
+	}
+	tb := mesh.NewTestbed(behavior, tester)
 
+	// Run the tests and check if length of aggregated words matches.
 	for i := 0; i < count; i++ {
-		topic := generator.Word()
-		plant.Emit(event.New(topic))
+		topic := strconv.Itoa(i)
+		tb.Emit(topic)
 	}
+	tb.Emit(behaviors.TopicAggregate)
+	tb.Emit(behaviors.TopicReset)
 
-	pl, plc := event.NewReplyPayload()
-	plant.Emit(event.New(event.TopicStatus, pl))
-
-	select {
-	case pl := <-plc:
-		topics := pl.At("topics").AsString("")
-		splitted := strings.Split(topics, "/")
-		assert.Length(splitted, count+1)
-	case <-time.After(5 * time.Second):
-		assert.Fail("timeout")
-	}
-
-	plant.AssertLength(0, count)
+	err := tb.Wait(time.Second)
+	assert.NoError(err)
 }
 
 // EOF

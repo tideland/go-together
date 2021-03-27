@@ -31,12 +31,14 @@ func TestPureOK(t *testing.T) {
 	// Init.
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	started := make(chan struct{})
+	stopped := make(chan struct{})
 	beenThereDoneThat := false
-	worker := func(lt loop.Terminator) error {
+	worker := func(ctx context.Context) error {
+		defer close(stopped)
 		close(started)
 		for {
 			select {
-			case <-lt.Done():
+			case <-ctx.Done():
 				beenThereDoneThat = true
 				return nil
 			case <-time.Tick(time.Minute):
@@ -50,7 +52,9 @@ func TestPureOK(t *testing.T) {
 	// Test.
 	assert.NoError(l.Err())
 	<-started
-	assert.NoError(l.Stop())
+	l.Stop()
+	<-stopped
+	assert.NoError(l.Err())
 	assert.True(beenThereDoneThat)
 }
 
@@ -59,11 +63,13 @@ func TestPureError(t *testing.T) {
 	// Init.
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	started := make(chan struct{})
-	worker := func(lt loop.Terminator) error {
+	stopped := make(chan struct{})
+	worker := func(ctx context.Context) error {
+		defer close(stopped)
 		close(started)
 		for {
 			select {
-			case <-lt.Done():
+			case <-ctx.Done():
 				return errors.New("ouch")
 			case <-time.Tick(50 * time.Millisecond):
 				// Just for linter.
@@ -76,7 +82,8 @@ func TestPureError(t *testing.T) {
 	// Test.
 	assert.NoError(l.Err())
 	<-started
-	assert.ErrorMatch(l.Stop(), "ouch")
+	l.Stop()
+	<-stopped
 	assert.ErrorMatch(l.Err(), "ouch")
 }
 
@@ -85,12 +92,12 @@ func TestContextCancelOK(t *testing.T) {
 	// Init.
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	worker := func(lt loop.Terminator) error {
-		defer close(done)
+	stopped := make(chan struct{})
+	worker := func(ctx context.Context) error {
+		defer close(stopped)
 		for {
 			select {
-			case <-lt.Done():
+			case <-ctx.Done():
 				return nil
 			case <-time.Tick(time.Minute):
 				// Just for linter.
@@ -105,7 +112,7 @@ func TestContextCancelOK(t *testing.T) {
 
 	// Test.
 	cancel()
-	<-done
+	<-stopped
 	assert.NoError(l.Err())
 }
 
@@ -114,12 +121,12 @@ func TestContextCancelError(t *testing.T) {
 	// Init.
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	worker := func(lt loop.Terminator) error {
-		defer close(done)
+	stopped := make(chan struct{})
+	worker := func(ctx context.Context) error {
+		defer close(stopped)
 		for {
 			select {
-			case <-lt.Done():
+			case <-ctx.Done():
 				return errors.New("oh, no")
 			case <-time.Tick(time.Minute):
 				// Just for linter.
@@ -134,7 +141,7 @@ func TestContextCancelError(t *testing.T) {
 
 	// Test.
 	cancel()
-	<-done
+	<-stopped
 	assert.ErrorMatch(l.Err(), "oh, no")
 }
 
@@ -142,11 +149,12 @@ func TestContextCancelError(t *testing.T) {
 func TestFinalizerOK(t *testing.T) {
 	// Init.
 	assert := asserts.NewTesting(t, asserts.FailStop)
+	stopped := make(chan struct{})
 	finalized := false
-	worker := func(lt loop.Terminator) error {
+	worker := func(ctx context.Context) error {
 		for {
 			select {
-			case <-lt.Done():
+			case <-ctx.Done():
 				return nil
 			case <-time.Tick(time.Minute):
 				// Just for linter.
@@ -154,9 +162,10 @@ func TestFinalizerOK(t *testing.T) {
 		}
 	}
 	finalizer := func(err error) error {
+		defer close(stopped)
 		assert.NoError(err)
 		finalized = true
-		return errors.New("finalization error")
+		return err
 	}
 	l, err := loop.Go(
 		worker,
@@ -165,20 +174,22 @@ func TestFinalizerOK(t *testing.T) {
 	assert.NoError(err)
 
 	// Test.
-	assert.ErrorMatch(l.Stop(), "finalization error")
-	assert.ErrorMatch(l.Err(), "finalization error")
+	l.Stop()
+	<-stopped
+	assert.NoError(l.Err())
 	assert.True(finalized)
 }
 
-// TestFinalizerError tests the stopping with an error, is kept
-// even if finalizer returns an error.
+// TestFinalizerError tests the stopping with an error but
+// finalizer returns an own one.
 func TestFinalizerError(t *testing.T) {
 	// Init.
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	worker := func(lt loop.Terminator) error {
+	stopped := make(chan struct{})
+	worker := func(ctx context.Context) error {
 		for {
 			select {
-			case <-lt.Done():
+			case <-ctx.Done():
 				return errors.New("don't want to stop")
 			case <-time.Tick(time.Minute):
 				// Just for linter.
@@ -186,6 +197,7 @@ func TestFinalizerError(t *testing.T) {
 		}
 	}
 	finalizer := func(err error) error {
+		defer close(stopped)
 		assert.ErrorMatch(err, "don't want to stop")
 		return errors.New("don't care")
 	}
@@ -196,7 +208,8 @@ func TestFinalizerError(t *testing.T) {
 	assert.NoError(err)
 
 	// Test.
-	assert.ErrorMatch(l.Stop(), "don't care")
+	l.Stop()
+	<-stopped
 	assert.ErrorMatch(l.Err(), "don't care")
 }
 
@@ -204,10 +217,12 @@ func TestFinalizerError(t *testing.T) {
 func TestInternalError(t *testing.T) {
 	// Init.
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	worker := func(lt loop.Terminator) error {
+	stopped := make(chan struct{})
+	worker := func(ctx context.Context) error {
+		defer close(stopped)
 		for {
 			select {
-			case <-lt.Done():
+			case <-ctx.Done():
 				return nil
 			case <-time.After(50 * time.Millisecond):
 				return errors.New("time over")
@@ -218,73 +233,78 @@ func TestInternalError(t *testing.T) {
 	assert.NoError(err)
 
 	// Test.
-	time.Sleep(100 * time.Millisecond)
-	assert.ErrorMatch(l.Stop(), "time over")
+	<-stopped
+	l.Stop()
 	assert.ErrorMatch(l.Err(), "time over")
 }
 
-// TestRecoveredOK tests the stopping without an error if Loop has a recoverer.
-// Recoverer must never been called.
-func TestRecoveredOK(t *testing.T) {
+// TestRepairerOK tests the stopping without an error if Loop has a repairer.
+// Repairer must never been called.
+func TestRepairerOK(t *testing.T) {
 	// Init.
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	beenThereDoneThat := false
-	worker := func(lt loop.Terminator) error {
+	repaired := make(chan struct{})
+	worker := func(ctx context.Context) error {
 		for {
 			select {
-			case <-lt.Done():
+			case <-ctx.Done():
 				return nil
 			case <-time.Tick(time.Minute):
 				// Just for linter.
 			}
 		}
 	}
-	recoverer := func(reason interface{}) error {
-		beenThereDoneThat = true
+	repairer := func(reason interface{}) error {
+		defer close(repaired)
 		return nil
 	}
 	l, err := loop.Go(
 		worker,
-		loop.WithRecoverer(recoverer),
+		loop.WithRepairer(repairer),
 	)
 	assert.NoError(err)
 
 	// Test.
-	assert.NoError(l.Stop())
-	assert.NoError(l.Err())
-	assert.False(beenThereDoneThat)
+	l.Stop()
+
+	select {
+	case <-repaired:
+		assert.Fail("repairer called")
+	case <-time.After(100 * time.Millisecond):
+		assert.OK(true)
+	}
 }
 
-// TestRecovererErrorOK tests the stopping with an error if Loop has a recoverer.
-// Recoverer must never been called.
-func TestRecovererErrorOK(t *testing.T) {
+// TestRepairerErrorOK tests the stopping with an error if Loop has a repairer.
+// Repairer must never been called.
+func TestRepairerErrorOK(t *testing.T) {
 	// Init.
 	assert := asserts.NewTesting(t, asserts.FailStop)
-	beenThereDoneThat := false
-	worker := func(lt loop.Terminator) error {
+	stopped := make(chan struct{})
+	worker := func(ctx context.Context) error {
+		defer close(stopped)
 		for {
 			select {
-			case <-lt.Done():
+			case <-ctx.Done():
 				return errors.New("oh, no")
 			case <-time.Tick(time.Minute):
 				// Just for linter.
 			}
 		}
 	}
-	recoverer := func(reason interface{}) error {
-		beenThereDoneThat = true
-		return nil
+	repairer := func(reason interface{}) error {
+		return fmt.Errorf("unexpected")
 	}
 	l, err := loop.Go(
 		worker,
-		loop.WithRecoverer(recoverer),
+		loop.WithRepairer(repairer),
 	)
 	assert.NoError(err)
 
 	// Test.
-	assert.ErrorMatch(l.Stop(), "oh, no")
+	l.Stop()
+	<-stopped
 	assert.ErrorMatch(l.Err(), "oh, no")
-	assert.False(beenThereDoneThat)
 }
 
 // TestRecoverPanics tests the stopping handling and later stopping
@@ -293,11 +313,11 @@ func TestRecoverPanicsOK(t *testing.T) {
 	// Init.
 	assert := asserts.NewTesting(t, asserts.FailStop)
 	panics := 0
-	done := make(chan struct{})
-	worker := func(lt loop.Terminator) error {
+	stopped := make(chan struct{})
+	worker := func(ctx context.Context) error {
 		for {
 			select {
-			case <-lt.Done():
+			case <-ctx.Done():
 				return nil
 			case <-time.After(50 * time.Millisecond):
 				panic("bam")
@@ -305,43 +325,43 @@ func TestRecoverPanicsOK(t *testing.T) {
 		}
 	}
 	finalizer := func(err error) error {
-		defer close(done)
+		defer close(stopped)
 		return err
 	}
-	recoverer := func(reason interface{}) error {
+	repairer := func(reason interface{}) error {
 		panics++
 		if panics > 10 {
-			return fmt.Errorf("too much: %v", reason)
+			return fmt.Errorf("too many panics: %v", reason)
 		}
 		return nil
 	}
 	l, err := loop.Go(
 		worker,
 		loop.WithFinalizer(finalizer),
-		loop.WithRecoverer(recoverer),
+		loop.WithRepairer(repairer),
 	)
 	assert.NoError(err)
 
 	// Test.
-	<-done
-	assert.ErrorMatch(l.Err(), "too much: bam")
+	<-stopped
+	assert.ErrorMatch(l.Err(), "too many panics: bam")
 }
 
 //--------------------
 // EXAMPLES
 //--------------------
 
-// ExampleWorker shows the usage of Loop with no recoverer. The inner loop
+// ExampleWorker shows the usage of Loop with no repairer. The inner loop
 // contains a select listening to the channel returned by Closer.Done().
 // Other channels are for the standard communication with the Loop.
 func ExampleWorker() {
 	prints := make(chan string)
 	ctx, cancel := context.WithCancel(context.Background())
 	// Sample loop worker.
-	worker := func(lt loop.Terminator) error {
+	worker := func(ctx context.Context) error {
 		for {
 			select {
-			case <-lt.Done():
+			case <-ctx.Done():
 				// We shall stop.
 				return nil
 			case str := <-prints:
@@ -361,46 +381,45 @@ func ExampleWorker() {
 	prints <- "Hello"
 	prints <- "World"
 
+	// cancel() terminates the loop via the context.
 	cancel()
 
+	// Returned error must be nil in this example.
 	if l.Err() != nil {
 		panic(l.Err())
 	}
 }
 
-// ExampleRecoverer demonstrates the usage of a recoverer.
-// Here the frequency of the recovered reasons (more than five
-// in 10 milliseconds) or the total number is checked. If the
-// total number is not interesting the reasons could be
-// trimmed by e.g. rs.Trim(5). The fields Time and Reason per
-// recovering allow even more diagnosis.
-func ExampleRecoverer() {
+// ExampleRepairer demonstrates the usage of a repairer.
+func ExampleRepairer() {
 	panics := make(chan string)
 	// Sample loop worker.
-	worker := func(lt loop.Terminator) error {
+	worker := func(ctx context.Context) error {
 		for {
 			select {
-			case <-lt.Done():
+			case <-ctx.Done():
 				return nil
 			case str := <-panics:
 				panic(str)
 			}
 		}
 	}
-	// Recovery function checking frequency and total number.
-	count := 0
-	recoverer := func(reason interface{}) error {
-		count++
-		if count > 10 {
-			return errors.New("too many errors")
+	// Repairer function checks the reasion. "never mind" will
+	// be repaired, all others lead to an error. The repairer
+	// is also responsable for fixing the owners state crashed
+	// during panic.
+	repairer := func(reason interface{}) error {
+		why := reason.(string)
+		if why == "never mind" {
+			return nil
 		}
-		return nil
+		return fmt.Errorf("worker panic: %v", why)
 	}
-	l, err := loop.Go(worker, loop.WithRecoverer(recoverer))
+	l, err := loop.Go(worker, loop.WithRepairer(repairer))
 	if err != nil {
 		panic(err)
 	}
-	_ = l.Stop()
+	l.Stop()
 }
 
 // EOF

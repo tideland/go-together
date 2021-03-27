@@ -1,6 +1,6 @@
 // Tideland Go Together - Cells - Behaviors
 //
-// Copyright (C) 2010-2020 Frank Mueller / Tideland / Oldenburg / Germany
+// Copyright (C) 2010-2021 Frank Mueller / Tideland / Oldenburg / Germany
 //
 // All rights reserved. Use of this source code is governed
 // by the new BSD license.
@@ -12,54 +12,33 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 //--------------------
 
 import (
-	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
-	"tideland.dev/go/together/fuse"
 )
 
 //--------------------
-// BROADCASTER BEHAVIOR
+// BROARDCASTER BEHAVIOR
 //--------------------
 
-// broadcasterBehavior is a simple repeater.
-type broadcasterBehavior struct {
-	id      string
-	emitter mesh.Emitter
+// broadcasterBehavior implements the broadcaster behavior.
+type broadcasterBehavior struct{}
+
+// NewBroadcasterBeehavior creates a behavior simply emitting pulled events.
+func NewBroadcasterBehavior() mesh.Behavior {
+	return &broadcasterBehavior{}
 }
 
-// NewBroadcasterBehavior creates a broadcasting behavior that just emits every
-// received event. It's intended to work as an entry point for events, which
-// shall be immediately processed by several subscribers.
-func NewBroadcasterBehavior(id string) mesh.Behavior {
-	return &broadcasterBehavior{
-		id: id,
+// Go aggregates the event.
+func (b *broadcasterBehavior) Go(cell mesh.Cell, in mesh.Receptor, out mesh.Emitter) error {
+	for {
+		select {
+		case <-cell.Context().Done():
+			return nil
+		case evt := <-in.Pull():
+			if err := out.EmitEvent(evt); err != nil {
+				return err
+			}
+		}
 	}
-}
-
-// ID returns the individual identifier of a behavior instance.
-func (b *broadcasterBehavior) ID() string {
-	return b.id
-}
-
-// Init the behavior.
-func (b *broadcasterBehavior) Init(emitter mesh.Emitter) error {
-	b.emitter = emitter
-	return nil
-}
-
-// Terminate the behavior.
-func (b *broadcasterBehavior) Terminate() error {
-	return nil
-}
-
-// Process emits the event to all subscribers.
-func (b *broadcasterBehavior) Process(evt *event.Event) {
-	fuse.Trigger(b.emitter.Broadcast(evt))
-}
-
-// Recover from an error.
-func (b *broadcasterBehavior) Recover(err interface{}) error {
-	return nil
 }
 
 // EOF

@@ -1,6 +1,6 @@
 // Tideland Go Together - Cells - Behaviors
 //
-// Copyright (C) 2010-2020 Frank Mueller / Tideland / Oldenburg / Germany
+// Copyright (C) 2010-2021 Frank Mueller / Tideland / Oldenburg / Germany
 //
 // All rights reserved. Use of this source code is governed
 // by the new BSD license.
@@ -12,74 +12,64 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 //--------------------
 
 import (
-	"tideland.dev/go/together/cells/event"
 	"tideland.dev/go/together/cells/mesh"
-	"tideland.dev/go/together/fuse"
 )
 
 //--------------------
 // AGGREGATOR BEHAVIOR
 //--------------------
 
-// Aggregator is a function receiving the current aggregated payload
+// AggregatorFunc is a function receiving the current aggregated payload
 // and event and returns the next aggregated payload.
-type Aggregator func(p *event.Payload, evt *event.Event) (*event.Payload, error)
+type AggregatorFunc func(aggregate interface{}, evt mesh.Event) (interface{}, error)
 
 // aggregatorBehavior implements the aggregator behavior.
 type aggregatorBehavior struct {
-	id        string
-	emitter   mesh.Emitter
-	payload   *event.Payload
-	aggregate Aggregator
+	initial    interface{}
+	aggregate  interface{}
+	aggregator AggregatorFunc
 }
 
 // NewAggregatorBehavior creates a behavior aggregating the received events
 // and emits events with the new aggregate. A "reset!" topic resets the
 // aggregate to nil again.
-func NewAggregatorBehavior(id string, pl *event.Payload, aggregator Aggregator) mesh.Behavior {
+func NewAggregatorBehavior(aggregate interface{}, aggregator AggregatorFunc) mesh.Behavior {
 	return &aggregatorBehavior{
-		id:        id,
-		payload:   pl,
-		aggregate: aggregator,
+		initial:    aggregate,
+		aggregate:  aggregate,
+		aggregator: aggregator,
 	}
 }
 
-// ID returns the individual identifier of a behavior instance.
-func (b *aggregatorBehavior) ID() string {
-	return b.id
-}
-
-// Init the behavior.
-func (b *aggregatorBehavior) Init(emitter mesh.Emitter) error {
-	b.emitter = emitter
-	return nil
-}
-
-// Terminate the behavior.
-func (b *aggregatorBehavior) Terminate() error {
-	return nil
-}
-
-// Process aggregates the event.
-func (b *aggregatorBehavior) Process(evt *event.Event) {
-	switch evt.Topic() {
-	case event.TopicStatus:
-		fuse.Trigger(evt.Payload().Reply(b.payload))
-	case event.TopicReset:
-		b.payload = nil
-	default:
-		pl, err := b.aggregate(b.payload, evt)
-		fuse.Trigger(err)
-		b.payload = pl
-		fuse.Trigger(b.emitter.Broadcast(event.New(TopicAggregated, pl)))
+// Go aggregates the event.
+func (b *aggregatorBehavior) Go(cell mesh.Cell, in mesh.Receptor, out mesh.Emitter) error {
+	for {
+		select {
+		case <-cell.Context().Done():
+			return nil
+		case evt := <-in.Pull():
+			switch evt.Topic() {
+			case TopicAggregate:
+				// Request aggregated.
+				if err := out.Emit(TopicAggregated, b.aggregate); err != nil {
+					return err
+				}
+			case TopicReset:
+				// Reset to initial value.
+				b.aggregate = b.initial
+				if err := out.Emit(TopicResetted); err != nil {
+					return err
+				}
+			default:
+				// Aggregate the event.
+				aggregate, err := b.aggregator(b.aggregate, evt)
+				if err != nil {
+					return err
+				}
+				b.aggregate = aggregate
+			}
+		}
 	}
-}
-
-// Recover from an error.
-func (b *aggregatorBehavior) Recover(err interface{}) error {
-	println("recovering of aggregator called")
-	b.payload = event.NewPayload()
-	return nil
 }
 
 // EOF
