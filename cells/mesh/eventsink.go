@@ -19,6 +19,9 @@ import (
 // EVENT SINK READER
 //--------------------
 
+// EventSinkDoFunc is used when looking over the collected events.
+type EventSinkDoFunc func(i int, evt Event) error
+
 // EventSinkReader can be used to read the events in a sink. It is a
 // specialized subfunctionality of the event sink.
 type EventSinkReader interface {
@@ -36,7 +39,7 @@ type EventSinkReader interface {
 	PeekAt(index int) (Event, bool)
 
 	// Do iterates over all collected events.
-	Do(do func(index int, evt Event) error) error
+	Do(do EventSinkDoFunc) error
 }
 
 //--------------------
@@ -131,7 +134,7 @@ func (s *EventSink) PeekAt(index int) (Event, bool) {
 
 // Do allows to iterate over all events of the sink and perform a
 // function.
-func (s *EventSink) Do(do func(i int, evt Event) error) error {
+func (s *EventSink) Do(do EventSinkDoFunc) error {
 	for i, evt := range s.events {
 		if err := do(i, evt); err != nil {
 			return err
