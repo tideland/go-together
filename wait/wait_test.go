@@ -1,6 +1,6 @@
 // Tideland Go Together - Wait - Unit Tests
 //
-// Copyright (C) 2019-2020 Frank Mueller / Tideland / Oldenburg / Germany
+// Copyright (C) 2019-2021 Frank Mueller / Tideland / Oldenburg / Germany
 //
 // All rights reserved. Use of this source code is governed
 // by the new BSD license.
@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"tideland.dev/go/audit/asserts"
+
 	"tideland.dev/go/together/wait"
 )
 
@@ -43,7 +44,6 @@ func TestPollWithChangingInterval(t *testing.T) {
 	}
 
 	// Tests.
-	assert.Logf("end with positive condition")
 	count := 0
 	err := wait.Poll(
 		context.Background(),
@@ -59,7 +59,6 @@ func TestPollWithChangingInterval(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(count, 5)
 
-	assert.Logf("end with exceeded ticker, 7 checks")
 	count = 0
 	err = wait.Poll(
 		context.Background(),
@@ -73,7 +72,6 @@ func TestPollWithChangingInterval(t *testing.T) {
 	assert.ErrorMatch(err, ".*exceeded.*")
 	assert.Equal(count, 7, "exceeded with a count")
 
-	assert.Logf("end with cancelled context")
 	count = 0
 	ctx, cancel := context.WithTimeout(context.Background(), 350*time.Millisecond)
 	defer cancel()
@@ -95,7 +93,6 @@ func TestPollWithInterval(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 
 	// Tests.
-	assert.Logf("end with positive condition")
 	count := 0
 	err := wait.Poll(
 		context.Background(),
@@ -111,7 +108,6 @@ func TestPollWithInterval(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(count, 5)
 
-	assert.Logf("using With...()")
 	count = 0
 	err = wait.WithInterval(context.Background(), 20*time.Millisecond, func() (bool, error) {
 		count++
@@ -123,7 +119,6 @@ func TestPollWithInterval(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(count, 5)
 
-	assert.Logf("end with cancelled context")
 	count = 0
 	ctx, cancel := context.WithTimeout(context.Background(), 110*time.Millisecond)
 	defer cancel()
@@ -146,7 +141,6 @@ func TestPollWithMaxInterval(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 
 	// Tests.
-	assert.Logf("end with positive condition")
 	count := 0
 	err := wait.Poll(
 		context.Background(),
@@ -162,7 +156,6 @@ func TestPollWithMaxInterval(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(count, 5)
 
-	assert.Logf("using With...()")
 	count = 0
 	err = wait.WithMaxIntervals(context.Background(), 20*time.Millisecond, 10, func() (bool, error) {
 		count++
@@ -174,7 +167,6 @@ func TestPollWithMaxInterval(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(count, 5)
 
-	assert.Logf("end with exceeded ticker, 10 checks")
 	count = 0
 	err = wait.Poll(
 		context.Background(),
@@ -187,7 +179,6 @@ func TestPollWithMaxInterval(t *testing.T) {
 	assert.ErrorMatch(err, ".*exceeded.*")
 	assert.Equal(count, 10, "exceeded with a count")
 
-	assert.Logf("end with exceeded ticker, no check")
 	count = 0
 	err = wait.Poll(
 		context.Background(),
@@ -200,7 +191,6 @@ func TestPollWithMaxInterval(t *testing.T) {
 	assert.ErrorMatch(err, ".*exceeded.*")
 	assert.Equal(count, 0)
 
-	assert.Logf("end with cancelled context")
 	count = 0
 	ctx, cancel := context.WithTimeout(context.Background(), 110*time.Millisecond)
 	defer cancel()
@@ -222,7 +212,6 @@ func TestPollWithDeadline(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 
 	// Tests.
-	assert.Logf("end with positive condition")
 	count := 0
 	err := wait.Poll(
 		context.Background(),
@@ -238,7 +227,6 @@ func TestPollWithDeadline(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(count, 5)
 
-	assert.Logf("using With...()")
 	count = 0
 	err = wait.WithDeadline(context.Background(), 20*time.Millisecond, time.Now().Add(210*time.Millisecond), func() (bool, error) {
 		count++
@@ -250,7 +238,6 @@ func TestPollWithDeadline(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(count, 5)
 
-	assert.Logf("end with exceeded ticker, 10 checks")
 	count = 0
 	err = wait.Poll(
 		context.Background(),
@@ -263,7 +250,6 @@ func TestPollWithDeadline(t *testing.T) {
 	assert.ErrorMatch(err, ".*exceeded.*")
 	assert.Range(count, 9, 11, "exceeded with a count")
 
-	assert.Logf("end with exceeded ticker, no check")
 	count = 0
 	err = wait.Poll(
 		context.Background(),
@@ -276,7 +262,6 @@ func TestPollWithDeadline(t *testing.T) {
 	assert.ErrorMatch(err, ".*exceeded.*")
 	assert.Equal(count, 0)
 
-	assert.Logf("end with cancelled context")
 	count = 0
 	ctx, cancel := context.WithTimeout(context.Background(), 110*time.Millisecond)
 	defer cancel()
@@ -298,7 +283,6 @@ func TestPollWithTimeout(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 
 	// Tests.
-	assert.Logf("end with positive condition")
 	count := 0
 	err := wait.Poll(
 		context.Background(),
@@ -314,7 +298,6 @@ func TestPollWithTimeout(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(count, 5)
 
-	assert.Logf("using With...()")
 	count = 0
 	err = wait.WithTimeout(context.Background(), 20*time.Millisecond, 210*time.Millisecond, func() (bool, error) {
 		count++
@@ -326,7 +309,6 @@ func TestPollWithTimeout(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(count, 5)
 
-	assert.Logf("end with timeout, 10 checks")
 	count = 0
 	err = wait.Poll(
 		context.Background(),
@@ -339,7 +321,6 @@ func TestPollWithTimeout(t *testing.T) {
 	assert.ErrorMatch(err, ".*exceeded.*")
 	assert.Range(count, 9, 11)
 
-	assert.Logf("end with timeout, no check")
 	count = 0
 	err = wait.Poll(
 		context.Background(),
@@ -352,7 +333,6 @@ func TestPollWithTimeout(t *testing.T) {
 	assert.ErrorMatch(err, ".*exceeded.*")
 	assert.Equal(count, 0)
 
-	assert.Logf("end with cancelled context")
 	count = 0
 	ctx, cancel := context.WithTimeout(context.Background(), 110*time.Millisecond)
 	defer cancel()
@@ -375,7 +355,6 @@ func TestPollWithJitter(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 
 	// Tests.
-	assert.Logf("end with positive condition")
 	timestamps := []time.Time{}
 	err := wait.Poll(
 		context.Background(),
@@ -396,7 +375,6 @@ func TestPollWithJitter(t *testing.T) {
 		assert.Range(diff, 50*time.Millisecond, 110*time.Millisecond)
 	}
 
-	assert.Logf("using With...()")
 	timestamps = []time.Time{}
 	err = wait.WithJitter(context.Background(), 50*time.Millisecond, 1.0, 1250*time.Millisecond, func() (bool, error) {
 		timestamps = append(timestamps, time.Now())
@@ -413,7 +391,6 @@ func TestPollWithJitter(t *testing.T) {
 		assert.Range(diff, 50*time.Millisecond, 110*time.Millisecond)
 	}
 
-	assert.Logf("end with exceeded ticker")
 	timestamps = []time.Time{}
 	err = wait.Poll(
 		context.Background(),
@@ -426,7 +403,6 @@ func TestPollWithJitter(t *testing.T) {
 	assert.ErrorMatch(err, ".*exceeded.*")
 	assert.Range(len(timestamps), 10, 25)
 
-	assert.Logf("end with timeout, no check")
 	timestamps = []time.Time{}
 	err = wait.Poll(
 		context.Background(),
@@ -439,7 +415,6 @@ func TestPollWithJitter(t *testing.T) {
 	assert.ErrorMatch(err, ".*exceeded.*")
 	assert.Empty(timestamps)
 
-	assert.Logf("end with cancelled context")
 	timestamps = []time.Time{}
 	ctx, cancel := context.WithTimeout(context.Background(), 350*time.Millisecond)
 	defer cancel()
@@ -481,7 +456,6 @@ func TestPoll(t *testing.T) {
 	}
 
 	// Tests.
-	assert.Logf("end with positive condition")
 	count := 0
 	err := wait.Poll(
 		context.Background(),
@@ -497,7 +471,6 @@ func TestPoll(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(count, 500)
 
-	assert.Logf("end with timeout, 1000 checks")
 	count = 0
 	err = wait.Poll(
 		context.Background(),
@@ -510,7 +483,6 @@ func TestPoll(t *testing.T) {
 	assert.ErrorMatch(err, ".*exceeded.*")
 	assert.Equal(count, 1000, "exceeded with a count")
 
-	assert.Logf("end with cancelled context")
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
 	defer cancel()
 	err = wait.Poll(
@@ -530,7 +502,6 @@ func TestPanic(t *testing.T) {
 	assert := asserts.NewTesting(t, asserts.FailStop)
 
 	// Test.
-	assert.Logf("using With...()")
 	count := 0
 	err := wait.WithInterval(context.Background(), 10*time.Millisecond, func() (bool, error) {
 		count++
