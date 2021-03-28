@@ -13,11 +13,24 @@ package behaviors // import "tideland.dev/go/together/cells/behaviors"
 
 // Standard topics.
 const (
-	TopicAggregate  = "aggregate!"
-	TopicAggregated = "aggregated"
-	TopicProcess    = "process!"
-	TopicReset      = "reset!"
-	TopicResetted   = "resetted"
+	TopicAggregate     = "aggregate!"
+	TopicAggregated    = "aggregated"
+	TopicCriterionDone = "criterion-done"
+	TopicProcess       = "process!"
+	TopicReset         = "reset!"
+	TopicResetted      = "resetted"
+)
+
+// CriterionMatch allows a combo criterion func to signal its
+// analysis rersult.
+type CriterionMatch string
+
+// Criterion matches.
+const (
+	CriterionDone      CriterionMatch = "criterion-done"
+	CriterionKeep                     = "criterion-keep"
+	CriterionDropFirst                = "criterion-drop-first"
+	CriterionDropLast                 = "criterion-drop-last"
 )
 
 // EOF
