@@ -27,7 +27,7 @@ import (
 type Event struct {
 	timestamp time.Time
 	topic     string
-	payload   []byte
+	payload   json.RawMessage
 }
 
 // nilEvent is returned in case of errors.
@@ -99,6 +99,36 @@ func (evt Event) String() string {
 		"Event{Timestamp:%s Topic:%v Payload:%v}",
 		evt.timestamp.Format(time.RFC3339Nano), evt.topic, string(evt.payload),
 	)
+}
+
+// MarshalJSON implements the custom JSON marshaling of the event.
+func (evt Event) MarshalJSON() ([]byte, error) {
+	tmp := struct {
+		Timestamp time.Time       `json:"timestamp"`
+		Topic     string          `json:"topic"`
+		Payload   json.RawMessage `json:"payload,omitempty"`
+	}{
+		Timestamp: evt.timestamp,
+		Topic:     evt.topic,
+		Payload:   evt.payload,
+	}
+	return json.Marshal(tmp)
+}
+
+// UnmarshalJSON implements the custom JSON unmarshaling of the event.
+func (evt *Event) UnmarshalJSON(data []byte) error {
+	tmp := struct {
+		Timestamp time.Time       `json:"timestamp"`
+		Topic     string          `json:"topic"`
+		Payload   json.RawMessage `json:"payload,omitempty"`
+	}{}
+	if err := json.Unmarshal(data, &tmp); err != nil {
+		return err
+	}
+	evt.timestamp = tmp.Timestamp
+	evt.topic = tmp.Topic
+	evt.payload = tmp.Payload
+	return nil
 }
 
 // EOF
