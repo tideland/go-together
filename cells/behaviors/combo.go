@@ -28,7 +28,7 @@ import (
 // be dropped, and CriterionClear when the collected events have to be
 // cleared for starting over. In case of CriterionDone it additionally
 // has to return a payload which will be emitted.
-type ComboCriterionFunc func(r mesh.EventSinkReader) (CriterionMatch, interface{})
+type ComboCriterionFunc func(r mesh.EventSinkReader) (CriterionMatch, interface{}, error)
 
 // comboBehavior implements the combo behavior.
 type comboBehavior struct {
@@ -58,10 +58,14 @@ func (b *comboBehavior) Go(cell mesh.Cell, in mesh.Receptor, out mesh.Emitter) e
 				b.sink.Clear()
 			default:
 				b.sink.Push(evt)
-				matches, pl := b.matches(b.sink)
+				matches, data, err := b.matches(b.sink)
+				if err != nil {
+					return err
+				}
 				switch matches {
 				case CriterionDone:
-					out.Emit(TopicCriterionDone, pl)
+					out.Emit(TopicCriterionDone, data)
+					b.sink.Clear()
 				case CriterionKeep:
 				case CriterionDropFirst:
 					b.sink.PullFirst()

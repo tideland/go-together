@@ -23,14 +23,15 @@ const (
 
 // CriterionMatch allows a combo criterion func to signal its
 // analysis rersult.
-type CriterionMatch string
+type CriterionMatch int
 
 // Criterion matches.
 const (
-	CriterionDone      CriterionMatch = "criterion-done"
-	CriterionKeep                     = "criterion-keep"
-	CriterionDropFirst                = "criterion-drop-first"
-	CriterionDropLast                 = "criterion-drop-last"
+	CriterionError CriterionMatch = iota
+	CriterionDone
+	CriterionKeep
+	CriterionDropFirst
+	CriterionDropLast
 )
 
 // EOF
